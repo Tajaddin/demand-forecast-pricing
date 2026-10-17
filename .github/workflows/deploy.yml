@@ -15,7 +15,7 @@ jobs:
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with: { version: "0.10.4" }
       - run: uv sync && uv run dfp data && uv run dfp elasticity && uv run dfp backtest --folds 2 --step 14 --no-prophet
