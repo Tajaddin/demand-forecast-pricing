@@ -1,0 +1,84 @@
+[project]
+name = "demand-forecast-pricing"
+version = "0.1.0"
+description = "Hotel demand forecasting, price elasticity and a simulated A/B pricing test on public booking data, with MLflow, FastAPI serving and a drift-gated retrain job"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12,<3.13"
+authors = [{ name = "Tajaddin Gafarov", email = "gafarovtajaddin@gmail.com" }]
+dependencies = [
+  "pandas>=2.3,<3",
+  "numpy>=2.2,<3",
+  "pyarrow>=19",
+  "scipy>=1.14",
+  "scikit-learn>=1.6",
+  "statsmodels>=0.14.4",
+  "lightgbm>=4.6",
+  "prophet>=1.1.6",
+  "mlflow>=3.1",
+  "evidently>=0.7.10,<0.8",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.34",
+  "pydantic>=2.10",
+  "pydantic-settings>=2.7",
+  "httpx>=0.28",
+  "typer>=0.15",
+  "structlog>=25",
+  "prometheus-client>=0.21",
+  "slowapi>=0.1.9",
+  "matplotlib>=3.9",
+  "opentelemetry-sdk>=1.30",
+  "opentelemetry-exporter-otlp-proto-http>=1.30",
+  "opentelemetry-instrumentation-fastapi>=0.51b0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-cov>=6",
+  "ruff>=0.9",
+  "mypy>=1.14",
+  "pandas-stubs>=2.2",
+  "types-requests",
+  "pip-audit>=2.7",
+]
+
+[project.scripts]
+dfp = "dfp.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dfp"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "W", "PL", "RUF", "SIM", "C4", "PT"]
+ignore = ["PLR0913", "PLR0917", "PLR2004", "S101", "S311", "S603", "E501", "PLR0912", "PLR0915", "RUF012", "PLC0415"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PLR", "B011", "PT018"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["integration: needs MLflow and the trained artifacts", "slow: long-running"]
+filterwarnings = ["ignore::FutureWarning", "ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["src/dfp"]
+omit = ["src/dfp/cli.py"]
