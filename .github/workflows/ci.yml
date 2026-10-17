@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { version: "0.10.4", enable-cache: true }
+      - run: uv sync --extra dev
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest -m "not integration" --cov=dfp --cov-report=xml --cov-report=term
+      - uses: actions/upload-artifact@v4
+        with: { name: coverage, path: coverage.xml, retention-days: 7 }
+
+  integration:
+    name: registry, gate and API (sqlite MLflow)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { version: "0.10.4", enable-cache: true }
+      - run: uv sync --extra dev
+      - run: uv run pytest -m integration -q
+
+  pipeline:
+    name: data, elasticity and A/B on the real file; short backtest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { version: "0.10.4", enable-cache: true }
+      - run: uv sync
+      - run: uv run dfp data
+      - run: uv run dfp elasticity
+      - run: uv run dfp ab --sims 200
+      - run: uv run dfp backtest --folds 3 --step 14 --no-prophet
+        env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
+      - run: uv run dfp train
+        env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
+      - run: uv run dfp retrain --simulate-drift
+        env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
+      - uses: actions/upload-artifact@v4
+        with: { name: reports, path: reports, retention-days: 7 }
+
+  alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker run --rm -v "$PWD/observability:/w" -w /w --entrypoint promtool prom/prometheus:v3.5.0 test rules alerts_test.yml
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.9.8" }
+      - run: terraform -chdir=infra/terraform fmt -check
+      - run: terraform -chdir=infra/terraform init -backend=false -input=false
+      - run: terraform -chdir=infra/terraform validate
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: astral-sh/setup-uv@v5
+        with: { version: "0.10.4" }
+      - run: uv sync --extra dev
+      - run: uv run pip-audit --skip-editable --ignore-vuln GHSA-0000-0000-0000 || uv run pip-audit --skip-editable
+
+  image:
+    runs-on: ubuntu-latest
+    needs: [python]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { version: "0.10.4" }
+      - run: uv sync && uv run dfp data && uv run dfp elasticity && uv run dfp backtest --folds 2 --step 14 --no-prophet
+        env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build -t dfp/api:ci .
+      - run: docker image ls dfp/api:ci --format '{{.Repository}} {{.Size}}'

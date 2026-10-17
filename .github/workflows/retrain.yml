@@ -1,0 +1,33 @@
+name: retrain
+
+# Weekly retrain with the drift gate against the production MLflow (MLFLOW_TRACKING_URI secret, including
+# basic-auth credentials if the server has them). The run's reports are kept as an artifact either way.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      simulate_drift:
+        description: "inject a synthetic shock to demonstrate the gate"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { version: "0.10.4", enable-cache: true }
+      - run: uv sync
+      - run: uv run dfp data
+      - run: uv run dfp retrain ${{ inputs.simulate_drift && '--simulate-drift' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: retrain-reports, path: reports, retention-days: 30 }
