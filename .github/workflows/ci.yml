@@ -92,6 +92,6 @@ jobs:
         with: { version: "0.10.4" }
       - run: uv sync && uv run dfp data && uv run dfp elasticity && uv run dfp backtest --folds 2 --step 14 --no-prophet
         env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - run: docker build -t dfp/api:ci .
       - run: docker image ls dfp/api:ci --format '{{.Repository}} {{.Size}}'
