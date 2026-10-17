@@ -1,0 +1,5 @@
+name                = "dfp-api"
+region              = "us-east-1"
+image_tag           = "0.1.0"
+mlflow_tracking_uri = "https://user:password@dfp-mlflow.fly.dev"
+api_keys            = "replace-with-a-long-random-key"

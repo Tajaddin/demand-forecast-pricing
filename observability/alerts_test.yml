@@ -1,0 +1,94 @@
+rule_files:
+  - alert_rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="api",instance="compose"}'
+        values: "0 0 0 0 0"
+      - series: 'up{job="api",instance="host"}'
+        values: "0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApiDown
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "No API instance is being scraped"
+              description: "Every API target has been down for 2 minutes."
+
+  - interval: 1m
+    input_series:
+      - series: 'up{job="api",instance="compose"}'
+        values: "1 1 1 1 1"
+      - series: 'up{job="api",instance="host"}'
+        values: "0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: ApiDown
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'model_loaded{instance="compose"}'
+        values: "0x8"
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: NoProductionModel
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: NoProductionModel
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "The API is up but serves no model"
+              description: "model_loaded has been 0 for 5 minutes: the registry alias is missing or MLflow is unreachable."
+
+  - interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/forecast",method="GET",status="200"}'
+        values: "0+60x12"
+      - series: 'http_request_duration_seconds_count{route="/forecast",method="GET",status="500"}'
+        values: "0+6x12"
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: critical }
+            exp_annotations:
+              summary: "More than 5% of requests fail"
+              description: "5xx share over 5 minutes is 9.091%."
+
+  - interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_bucket{route="/forecast",le="0.5"}'
+        values: "0+10x20"
+      - series: 'http_request_duration_seconds_bucket{route="/forecast",le="1"}'
+        values: "0+10x20"
+      - series: 'http_request_duration_seconds_bucket{route="/forecast",le="2.5"}'
+        values: "0+100x20"
+      - series: 'http_request_duration_seconds_bucket{route="/forecast",le="+Inf"}'
+        values: "0+100x20"
+    alert_rule_test:
+      - eval_time: 16m
+        alertname: SlowForecasts
+        exp_alerts:
+          - exp_labels: { severity: warning }
+            exp_annotations:
+              summary: "Forecast p95 above 1 s"
+              description: "p95 over 5 minutes is 2.417s."
+
+  - interval: 1m
+    input_series:
+      - series: "rate_limit_rejections_total"
+        values: "0+120x15"
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: RateLimitSpike
+        exp_alerts:
+          - exp_labels: { severity: info }
+            exp_annotations:
+              summary: "Sustained rate limiting"
+              description: "More than one request per second is being rejected."

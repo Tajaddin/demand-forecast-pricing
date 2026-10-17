@@ -1,0 +1,79 @@
+name: dfp
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.17.1
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts --serve-artifacts
+      --allowed-hosts mlflow,mlflow:5000,localhost,localhost:5002,127.0.0.1,127.0.0.1:5002,host.docker.internal:5002
+    volumes: [mlflow:/mlflow]
+    ports: ["${MLFLOW_PORT:-5002}:5000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    image: dfp/api:local
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      DFP_API_KEYS: ${DFP_API_KEYS:-}
+      DFP_RATE_LIMIT: ${DFP_RATE_LIMIT:-60/minute}
+      DFP_LOG_LEVEL: ${DFP_LOG_LEVEL:-INFO}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    ports: ["${API_PORT:-8100}:8000"]
+    depends_on:
+      mlflow: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/metrics')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # Weekly retrain the way a cron job would run it: same image, the retrain command, against the same MLflow.
+  retrain:
+    profiles: [jobs]
+    image: dfp/api:local
+    command: ["dfp", "retrain"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes: ["./reports:/app/reports", "./data:/app/data:ro"]
+    depends_on:
+      mlflow: { condition: service_healthy }
+
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+    ports: ["${PROMETHEUS_PORT:-9103}:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  alertmanager:
+    profiles: [observability]
+    image: prom/alertmanager:v0.28.1
+    volumes: ["./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"]
+    ports: ["${ALERTMANAGER_PORT:-9104}:9093"]
+
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["${GRAFANA_PORT:-3006}:3000"]
+    depends_on: [prometheus]
+
+volumes:
+  mlflow:

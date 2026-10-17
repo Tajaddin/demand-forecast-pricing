@@ -1,0 +1,44 @@
+groups:
+  - name: dfp
+    rules:
+      - alert: ApiDown
+        expr: max(up{job="api"}) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "No API instance is being scraped"
+          description: "Every API target has been down for 2 minutes."
+
+      - alert: NoProductionModel
+        expr: max(model_loaded) == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "The API is up but serves no model"
+          description: "model_loaded has been 0 for 5 minutes: the registry alias is missing or MLflow is unreachable."
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{status=~"5.."}[5m]))
+            / sum(rate(http_request_duration_seconds_count[5m])) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "More than 5% of requests fail"
+          description: "5xx share over 5 minutes is {{ $value | humanizePercentage }}."
+
+      - alert: SlowForecasts
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{route="/forecast"}[5m]))) > 1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Forecast p95 above 1 s"
+          description: "p95 over 5 minutes is {{ $value | humanizeDuration }}."
+
+      - alert: RateLimitSpike
+        expr: sum(rate(rate_limit_rejections_total[5m])) > 1
+        for: 10m
+        labels: { severity: info }
+        annotations:
+          summary: "Sustained rate limiting"
+          description: "More than one request per second is being rejected."

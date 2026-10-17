@@ -1,0 +1,137 @@
+{
+  "baseline": {
+    "hotel": "City Hotel",
+    "days": 56,
+    "weekday_demand": {
+      "0": 80.0,
+      "1": 57.75,
+      "2": 60.75,
+      "3": 67.625,
+      "4": 64.125,
+      "5": 77.375,
+      "6": 64.375
+    },
+    "weekday_adr": {
+      "0": 132.46208384615778,
+      "1": 132.5052819797523,
+      "2": 133.8229590342988,
+      "3": 136.08773093969248,
+      "4": 137.3506291382989,
+      "5": 134.84995305386954,
+      "6": 133.34684186844945
+    },
+    "mean_nights": 2.9432273519163763,
+    "residual_sd": 15.412804594055732,
+    "revenue_per_day_mean": 28314.399285714288,
+    "revenue_per_day_sd": 6656.723951501522
+  },
+  "design": {
+    "days_per_arm": 28,
+    "alpha": 0.05,
+    "target_power": 0.8,
+    "revenue_per_day_mean": 28314.399285714288,
+    "revenue_per_day_sd": 6656.723951501522,
+    "mde_relative_at_target_power": 0.17924119363045307,
+    "price_change": 0.05,
+    "elasticity": -1.0,
+    "expected_revenue_lift": 0.0,
+    "power_at_expected_lift": 0.05000000000000002,
+    "days_per_arm_needed_for_expected_lift": null
+  },
+  "design_larger_change": {
+    "days_per_arm": 28,
+    "alpha": 0.05,
+    "target_power": 0.8,
+    "revenue_per_day_mean": 28314.399285714288,
+    "revenue_per_day_sd": 6656.723951501522,
+    "mde_relative_at_target_power": 0.17924119363045307,
+    "price_change": 0.15,
+    "elasticity": -1.0,
+    "expected_revenue_lift": 0.0,
+    "power_at_expected_lift": 0.05000000000000002,
+    "days_per_arm_needed_for_expected_lift": null
+  },
+  "result": {
+    "days_a": 28,
+    "days_b": 28,
+    "revenue_per_day_a": 24970.81222770089,
+    "revenue_per_day_b": 27086.59038283826,
+    "difference_per_day": 2115.77815513737,
+    "relative_lift": 0.08473004946111734,
+    "ci95_difference": [
+      -705.861084539631,
+      4786.080054819937
+    ],
+    "ci95_relative": [
+      -0.028267445932599562,
+      0.19166697547429357
+    ],
+    "welch_t": 1.4787241141637175,
+    "p_value": 0.14507132681580562,
+    "arrivals_per_day_a": 63.285714285714285,
+    "arrivals_per_day_b": 65.10714285714286,
+    "significant_at_5pct": false
+  },
+  "monte_carlo": {
+    "simulations": 2000,
+    "empirical_power": 0.047,
+    "mean_estimated_lift": 0.0022608824461495887,
+    "true_lift": 0.0
+  },
+  "monte_carlo_larger_change": {
+    "simulations": 2000,
+    "empirical_power": 0.0465,
+    "mean_estimated_lift": 0.0005231585540652956,
+    "true_lift": 0.0
+  },
+  "sensitivity": [
+    {
+      "days_per_arm": 28,
+      "alpha": 0.05,
+      "target_power": 0.8,
+      "revenue_per_day_mean": 28314.399285714288,
+      "revenue_per_day_sd": 6656.723951501522,
+      "mde_relative_at_target_power": 0.17924119363045307,
+      "price_change": 0.05,
+      "elasticity": -0.5,
+      "expected_revenue_lift": 0.02469507659595993,
+      "power_at_expected_lift": 0.06724431661959389,
+      "days_per_arm_needed_for_expected_lift": 1424.0
+    },
+    {
+      "days_per_arm": 28,
+      "alpha": 0.05,
+      "target_power": 0.8,
+      "revenue_per_day_mean": 28314.399285714288,
+      "revenue_per_day_sd": 6656.723951501522,
+      "mde_relative_at_target_power": 0.17924119363045307,
+      "price_change": 0.05,
+      "elasticity": -1.0,
+      "expected_revenue_lift": 0.0,
+      "power_at_expected_lift": 0.05000000000000002,
+      "days_per_arm_needed_for_expected_lift": null
+    },
+    {
+      "days_per_arm": 28,
+      "alpha": 0.05,
+      "target_power": 0.8,
+      "revenue_per_day_mean": 28314.399285714288,
+      "revenue_per_day_sd": 6656.723951501522,
+      "mde_relative_at_target_power": 0.17924119363045307,
+      "price_change": 0.05,
+      "elasticity": -1.5,
+      "expected_revenue_lift": -0.024099927051466796,
+      "power_at_expected_lift": 0.06641587195701064,
+      "days_per_arm_needed_for_expected_lift": null
+    }
+  ],
+  "booking_level_design": {
+    "bookings_per_arm": 1800,
+    "revenue_per_booking_mean": 343.30374142705006,
+    "revenue_per_booking_sd": 234.753460507938,
+    "mde_relative_at_target_power": 0.06387515799166223,
+    "expected_revenue_lift": 0.0,
+    "power_at_expected_lift": 0.05
+  },
+  "elasticity_source": "assumption"
+}

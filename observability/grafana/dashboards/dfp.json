@@ -1,0 +1,63 @@
+{
+  "title": "Demand forecast API",
+  "uid": "dfp-api",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "15s",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Production model version",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "max(model_version)" }]
+    },
+    {
+      "type": "stat",
+      "title": "Model loaded",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "max(model_loaded)" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests per second by route",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (route) (rate(http_request_duration_seconds_count[1m]))", "legendFormat": "{{route}}" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Forecast rows and recommendations served",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (hotel) (increase(forecasts_served_total[5m]))", "legendFormat": "forecast rows {{hotel}}" },
+        { "expr": "sum by (hotel) (increase(price_recommendations_total[5m]))", "legendFormat": "recommendations {{hotel}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Responses by status and rate-limit rejections",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (status) (rate(http_request_duration_seconds_count[1m]))", "legendFormat": "{{status}}" },
+        { "expr": "rate(rate_limit_rejections_total[1m])", "legendFormat": "429" }
+      ]
+    }
+  ]
+}

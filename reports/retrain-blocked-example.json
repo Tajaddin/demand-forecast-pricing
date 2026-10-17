@@ -1,0 +1,82 @@
+{
+  "run_utc": "2026-10-17 14:14",
+  "model_type": "sarima",
+  "version": "3",
+  "promoted": false,
+  "reasons": [
+    "drift: 50% of the model's input columns drifted (threshold 30%)"
+  ],
+  "holdout_days": 28,
+  "holdout_wape": 18.398115683842153,
+  "holdout_wape_by_hotel": {
+    "City Hotel": 20.648748996633483,
+    "Resort Hotel": 14.374324053901486
+  },
+  "production_wape_before": 18.3981,
+  "production_version_before": "2",
+  "drift": {
+    "gate_columns": [
+      "arrivals",
+      "room_nights",
+      "cancellations",
+      "dow"
+    ],
+    "gate_drifted_share": 0.5,
+    "drifted_share": 0.625,
+    "drifted_columns": 5,
+    "per_column": {
+      "arrivals": {
+        "method": "K-S p_value",
+        "statistic": 1.3816716420147607e-06,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "room_nights": {
+        "method": "K-S p_value",
+        "statistic": 1.876011884321618e-12,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "revenue": {
+        "method": "K-S p_value",
+        "statistic": 9.081285831562493e-29,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "adr_mean": {
+        "method": "K-S p_value",
+        "statistic": 2.122638761108631e-15,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "lead_time_mean": {
+        "method": "K-S p_value",
+        "statistic": 0.004031641904002101,
+        "threshold": 0.05,
+        "drifted": true
+      },
+      "cancellations": {
+        "method": "K-S p_value",
+        "statistic": 0.0615467375621152,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "hotel": {
+        "method": "Z-test p_value",
+        "statistic": 1.0,
+        "threshold": 0.05,
+        "drifted": false
+      },
+      "dow": {
+        "method": "chi-square p_value",
+        "statistic": 1.0,
+        "threshold": 0.05,
+        "drifted": false
+      }
+    },
+    "reference_rows": 112,
+    "current_rows": 56
+  },
+  "simulate_drift": true,
+  "trained_through": "2017-08-31"
+}

@@ -1,0 +1,18 @@
+{
+  "rows": 119390,
+  "hotels": [
+    "City Hotel",
+    "Resort Hotel"
+  ],
+  "first_day": "2015-07-01",
+  "last_day": "2017-08-31",
+  "days_per_hotel": {
+    "City Hotel": 793,
+    "Resort Hotel": 793
+  },
+  "missing_days": 0,
+  "negative_values": 0,
+  "adr_out_of_range_bookings": 2,
+  "cancelled_share": 0.37041628277075134,
+  "passed": true
+}

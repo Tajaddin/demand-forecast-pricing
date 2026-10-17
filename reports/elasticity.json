@@ -1,0 +1,102 @@
+{
+  "naive": {
+    "elasticity": 0.07886589554643539,
+    "se": 0.1228801890984961,
+    "ci_low": -0.16197484950008834,
+    "ci_high": 0.3197066405929591,
+    "p_value": 0.520995703096018,
+    "n": 1063,
+    "r2": 0.5445827763366484
+  },
+  "controlled": {
+    "elasticity": 0.11412119169264776,
+    "se": 0.1298314513264983,
+    "ci_low": -0.1403437769678539,
+    "ci_high": 0.3685861603531494,
+    "p_value": 0.3794040071878133,
+    "n": 1063,
+    "r2": 0.5865757530165625
+  },
+  "by_hotel": {
+    "City Hotel": {
+      "elasticity": 0.9817522920625845,
+      "se": 0.44532060468972334,
+      "ci_low": 0.10893994529712803,
+      "ci_high": 1.854564638828041,
+      "p_value": 0.027482414402145643,
+      "n": 542,
+      "r2": 0.6213587111236687
+    },
+    "Resort Hotel": {
+      "elasticity": 0.5370632531947263,
+      "se": 0.2498601742467359,
+      "ci_low": 0.04734631050022153,
+      "ci_high": 1.026780195889231,
+      "p_value": 0.03159833299688042,
+      "n": 521,
+      "r2": 0.6398122436452544
+    }
+  },
+  "by_segment": {
+    "Corporate": {
+      "elasticity": -0.9147487929684347,
+      "se": 0.2001457578226654,
+      "ci_low": -1.3070272699593346,
+      "ci_high": -0.5224703159775348,
+      "p_value": 4.86763743526772e-06,
+      "n": 221,
+      "r2": 0.6207642501095112
+    },
+    "Direct": {
+      "elasticity": -0.081501368365617,
+      "se": 0.26216347053288347,
+      "ci_low": -0.5953323286720964,
+      "ci_high": 0.43232959194086235,
+      "p_value": 0.7558918822526266,
+      "n": 224,
+      "r2": 0.4288289189347828
+    },
+    "Groups": {
+      "elasticity": 0.21988744287301337,
+      "se": 0.5258154230642637,
+      "ci_low": -0.8106918488486352,
+      "ci_high": 1.2504667345946618,
+      "p_value": 0.675812807173622,
+      "n": 163,
+      "r2": 0.4596543067041653
+    },
+    "Offline TA/TO": {
+      "elasticity": 0.22121240619527902,
+      "se": 0.2153380164055546,
+      "ci_low": -0.20084235046190332,
+      "ci_high": 0.6432671628524613,
+      "p_value": 0.3042887055665848,
+      "n": 228,
+      "r2": 0.5612487542480399
+    },
+    "Online TA": {
+      "elasticity": 0.5471255934695392,
+      "se": 0.2625116014484946,
+      "ci_low": 0.03261230910655699,
+      "ci_high": 1.0616388778325212,
+      "p_value": 0.03714235500502558,
+      "n": 227,
+      "r2": 0.6716664587522223
+    }
+  },
+  "identified": false,
+  "planning_elasticity": -1.0,
+  "planning_source": "assumption",
+  "sensitivity": [
+    -0.5,
+    -1.0,
+    -1.5
+  ],
+  "method": {
+    "naive": "OLS of log weekly bookings on log mean ADR with hotel, segment, month and year fixed effects; HC3 errors",
+    "controlled": "adds week-of-year effects, the other hotel's bookings that week (log) as a market-demand proxy, and mean lead time",
+    "unit": "hotel x market segment x ISO week with at least one non-cancelled priced booking"
+  },
+  "diagnosis": "A positive or non-negative coefficient means prices and bookings rise together: the hotels set ADR with the demand they expect, so the regression recovers the pricing rule, not the demand curve (simultaneity). Controls for the demand the hotel could observe shrink the bias but cannot remove it without an instrument or an experiment.",
+  "planning_note": "Planning assumption, not an estimate from this data: unit elasticity (revenue flat to small price changes), bracketed by -0.5 and -1.5 in the sensitivity analysis. The A/B test exists to replace it with a measurement."
+}
