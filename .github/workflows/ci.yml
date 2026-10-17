@@ -20,7 +20,7 @@ jobs:
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy
       - run: uv run pytest -m "not integration" --cov=dfp --cov-report=xml --cov-report=term
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: coverage, path: coverage.xml, retention-days: 7 }
 
   integration:
@@ -50,7 +50,7 @@ jobs:
         env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
       - run: uv run dfp retrain --simulate-drift
         env: { MLFLOW_TRACKING_URI: sqlite:///mlflow.db }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: reports, path: reports, retention-days: 7 }
 
   alerts:
