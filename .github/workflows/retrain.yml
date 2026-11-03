@@ -1,7 +1,8 @@
 name: retrain
 
 # Weekly retrain with the drift gate against the production MLflow (MLFLOW_TRACKING_URI secret, including
-# basic-auth credentials if the server has them). The run's reports are kept as an artifact either way.
+# basic-auth credentials if the server has them). Without that secret it uses a throwaway SQLite store, so the
+# gates still run and nothing is registered. The run's reports are kept as an artifact either way.
 on:
   schedule:
     - cron: "0 6 * * 1"
@@ -20,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'sqlite:///mlflow.db' }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

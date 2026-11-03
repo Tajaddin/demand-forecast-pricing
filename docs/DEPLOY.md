@@ -37,8 +37,9 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 ## Scheduled retrain
 
 `.github/workflows/retrain.yml` runs `dfp retrain` every Monday against `MLFLOW_TRACKING_URI` from the
-`production` environment secrets and keeps the reports as an artifact. The Compose `jobs` profile runs the same
-command: `docker compose --profile jobs run --rm retrain`.
+`production` environment secrets and keeps the reports as an artifact. Without that secret it falls back to a
+throwaway SQLite store: the gates and reports still run, but nothing reaches a registry. The Compose `jobs`
+profile runs the same command: `docker compose --profile jobs run --rm retrain`.
 
 ## Fly.io (free allowance)
 
