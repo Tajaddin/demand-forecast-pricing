@@ -6,6 +6,9 @@ updates:
   directory: /
   schedule:
     interval: monthly
+  # A newer pyarrow does not resolve with the rest of the group and fails the whole job.
+  ignore:
+  - dependency-name: pyarrow
   groups:
     uv:
       patterns:
