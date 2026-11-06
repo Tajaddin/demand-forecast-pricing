@@ -8,16 +8,27 @@ from typing import Any
 
 import structlog
 
-_URL_CREDENTIALS = re.compile(r"(?<=://)[^/\s@]+@")
+# Up to the last "@" of the authority, so a password with an unencoded "@" is masked whole.
+_URL_CREDENTIALS = re.compile(r"(?<=://)[^/?#\s]*@")
+
+
+def _redact(value: Any) -> Any:
+    if isinstance(value, str):
+        return _URL_CREDENTIALS.sub("***@", value)
+    if isinstance(value, dict):
+        return {k: _redact(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [_redact(v) for v in value]
+    return value
 
 
 def redact_url_credentials(
     _logger: Any, _method: str, event_dict: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
-    """Masks user:password@ in any URL inside a string field, e.g. a tracking URI quoted in an MLflow error."""
+    """Masks user:password@ in any URL inside a field, nested ones included, e.g. a tracking URI quoted in an
+    MLflow error."""
     for key, value in event_dict.items():
-        if isinstance(value, str):
-            event_dict[key] = _URL_CREDENTIALS.sub("***@", value)
+        event_dict[key] = _redact(value)
     return event_dict
 
 

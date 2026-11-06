@@ -57,6 +57,12 @@ def test_log_lines_drop_credentials_from_urls():
     assert out["error"] == "API request to http://***@127.0.0.1:9/api/2.0 failed"
     assert out["n"] == 3
 
+    # a raw "@" in the password, and URLs inside nested values
+    event = {"error": "http://u:p@ss@host/api?to=a@b", "context": {"uris": [TRACKING_URI, "sqlite:///x.db"]}}
+    out = redact_url_credentials(None, "warning", event)
+    assert out["error"] == "http://***@host/api?to=a@b"
+    assert out["context"] == {"uris": ["http://***@127.0.0.1:9", "sqlite:///x.db"]}
+
 
 def test_keyed_routes_refuse_requests_when_no_keys_are_configured(no_registry, monkeypatch):
     monkeypatch.setenv("DFP_API_KEYS", "")
