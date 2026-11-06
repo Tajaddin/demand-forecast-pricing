@@ -14,9 +14,11 @@ for app in "$MLFLOW_APP" "$API_APP"; do
 done
 
 fly volumes list -a "$MLFLOW_APP" --json | grep -q mlflow_data || fly volumes create mlflow_data -a "$MLFLOW_APP" --region mia --size 1 --yes
+# MLflow's basic-auth app has no default admin password: it creates the admin from these on first start.
+fly secrets set --stage -a "$MLFLOW_APP" "MLFLOW_AUTH_ADMIN_USERNAME=$MLFLOW_USER" \
+  "MLFLOW_AUTH_ADMIN_PASSWORD=$MLFLOW_PASSWORD" >/dev/null
 fly deploy -c fly.mlflow.toml -a "$MLFLOW_APP"
 MLFLOW_URL="https://${MLFLOW_APP}.fly.dev"
-echo "MLflow basic-auth users are managed with the mlflow auth CLI inside the app; see docs/DEPLOY.md"
 
 # MLflow reads basic-auth credentials from these variables, so they never sit in the URI, which error messages quote.
 fly secrets set --stage -a "$API_APP" "MLFLOW_TRACKING_URI=$MLFLOW_URL" "MLFLOW_TRACKING_USERNAME=$MLFLOW_USER" \

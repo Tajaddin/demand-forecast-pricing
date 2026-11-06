@@ -49,8 +49,9 @@ export MLFLOW_USER=admin MLFLOW_PASSWORD='...' DFP_API_KEYS='...'
 make deploy
 ```
 
-`scripts/deploy.sh` creates two apps: `dfp-mlflow` (MLflow server with a 1 GB volume, basic auth; create the
-first user with `fly ssh console -a dfp-mlflow -C "mlflow auth create-user ..."` as the MLflow docs describe) and
+`scripts/deploy.sh` creates two apps: `dfp-mlflow` (MLflow server with a 1 GB volume and basic auth; MLflow has
+no default admin password and creates the admin on first start from the `MLFLOW_AUTH_ADMIN_USERNAME` and
+`MLFLOW_AUTH_ADMIN_PASSWORD` secrets, which the script sets from `MLFLOW_USER` and `MLFLOW_PASSWORD`) and
 `dfp-api`, with `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` and `DFP_API_KEYS`
 as secrets. MLflow reads the credentials from those two variables; keep them out of the URI, which MLflow quotes
 in its error messages. Then populate the registry from this machine:
