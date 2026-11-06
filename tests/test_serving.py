@@ -103,4 +103,4 @@ def test_price_endpoint_recommends_no_change_at_the_default_elasticity(no_regist
     body = r.json()
     assert body["elasticity"] == -1.0 and body["elasticity_source"].startswith("default")
     assert body["recommended_change"] == 0.0 and body["recommended_price"] == 120
-    assert "no change" in body["note"]
+    assert body["flat"] is True and "no change" in body["note"]

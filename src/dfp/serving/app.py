@@ -261,6 +261,7 @@ def create_app() -> FastAPI:
             "expected_revenue_change": round(rec.revenue_change_vs_base, 4),
             "expected_profit": round(rec.expected_profit, 2),
             "inelastic": rec.inelastic,
+            "flat": rec.flat,
             "note": _price_note(rec, body.min_change, body.max_change, body.unit_cost),
             "curve": [
                 {
