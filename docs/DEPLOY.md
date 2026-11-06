@@ -37,7 +37,8 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 ## Scheduled retrain
 
 `.github/workflows/retrain.yml` runs `dfp retrain` every Monday against `MLFLOW_TRACKING_URI` from the
-`production` environment secrets and keeps the reports as an artifact. Without that secret it falls back to a
+`production` environment secrets (with `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` when the server
+has basic auth) and keeps the reports as an artifact. Without that secret it falls back to a
 throwaway SQLite store: the gates and reports still run, but nothing reaches a registry. The Compose `jobs`
 profile runs the same command: `docker compose --profile jobs run --rm retrain`.
 
@@ -50,10 +51,12 @@ make deploy
 
 `scripts/deploy.sh` creates two apps: `dfp-mlflow` (MLflow server with a 1 GB volume, basic auth; create the
 first user with `fly ssh console -a dfp-mlflow -C "mlflow auth create-user ..."` as the MLflow docs describe) and
-`dfp-api`, with `MLFLOW_TRACKING_URI` and `DFP_API_KEYS` as secrets. Then populate the registry from this machine:
+`dfp-api`, with `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` and `DFP_API_KEYS`
+as secrets. MLflow reads the credentials from those two variables; keep them out of the URI, which MLflow quotes
+in its error messages. Then populate the registry from this machine:
 
 ```bash
-MLFLOW_TRACKING_URI=https://admin:...@dfp-mlflow.fly.dev make backtest train
+MLFLOW_TRACKING_URI=https://dfp-mlflow.fly.dev MLFLOW_TRACKING_USERNAME=admin MLFLOW_TRACKING_PASSWORD='...' make backtest train
 curl -X POST https://dfp-api.fly.dev/model/reload -H "X-API-Key: ..."
 ```
 
