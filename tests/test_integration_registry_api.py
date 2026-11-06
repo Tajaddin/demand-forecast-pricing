@@ -43,11 +43,6 @@ def test_first_train_promotes_then_the_gate_blocks_a_drifted_window(daily, env):
     assert blocked["drift"]["gate_drifted_share"] >= env.drift_share_threshold
     assert (env.reports_dir / "retrain-blocked-example.json").exists()
 
-    worse = Settings(promotion_tolerance=-0.5)  # anything is "worse" than production minus 50%
-    gated = retrain(daily, worse, model_type="seasonal_naive")
-    assert not gated["promoted"]
-    assert any("WAPE" in r for r in gated["reasons"])
-
 
 def _harder_newest_weeks(daily, days):
     """Alternating +50% and -50% days in the newest window: every model forecasts it worse."""
@@ -59,22 +54,48 @@ def _harder_newest_weeks(daily, days):
     return out
 
 
-def test_the_gate_scores_production_on_the_same_window(daily, env):
+def test_the_gate_scores_its_references_on_the_same_window(daily, env):
     drifted = retrain(daily, env, simulate_drift=True, model_type="seasonal_naive")
     assert not drifted["promoted"] and production_version(env) is None  # a version, but no alias yet
 
     first = retrain(daily, env, force_promote=True, model_type="seasonal_naive")
     hard = retrain(_harder_newest_weeks(daily, env.holdout_days), env, model_type="seasonal_naive")
     # the newest weeks are much harder than the window production was first scored on; that is not the
-    # challenger's fault, and the same model type scored on the same window does no better
+    # challenger's fault. A seasonal-naive refit is both the floor and production's type: nothing else to score
     assert hard["holdout_wape"] > first["holdout_wape"] * (1 + env.promotion_tolerance)
-    assert not any("worse than production" in r for r in hard["reasons"]), hard["reasons"]
-    assert hard["production_holdout_wape"] == pytest.approx(hard["holdout_wape"])
+    assert not any("worse than" in r for r in hard["reasons"]), hard["reasons"]
+    assert hard["reference_holdout_wape"] == {}
 
     challenger = retrain(daily, env, model_type="naive")
     assert challenger["production_model_type"] == "seasonal_naive"
     expected, _ = holdout_wape(daily, "seasonal_naive", env.holdout_days, None)
-    assert challenger["production_holdout_wape"] == pytest.approx(expected)
+    assert challenger["reference_holdout_wape"] == pytest.approx({"seasonal_naive": expected})
+
+
+def _strong_weekly_pattern(daily):
+    """Weekends at three times the weekday level: a last-value forecast misses it, seasonal naive does not."""
+    out = daily.copy()
+    weekend = out["arrival_date"].dt.dayofweek >= 5
+    out.loc[weekend, "arrivals"] = out.loc[weekend, "arrivals"] * 3
+    return out
+
+
+def test_a_refit_worse_than_the_seasonal_naive_floor_is_blocked(daily, env):
+    weekly = _strong_weekly_pattern(daily)
+    retrain(weekly, env, force_promote=True, model_type="naive")
+    # production is naive too: compared with production's model type, the refit would be compared with itself
+    refit = retrain(weekly, env, model_type="naive")
+    assert not refit["promoted"], refit["reasons"]
+    floor = refit["reference_holdout_wape"]
+    assert floor.keys() == {"seasonal_naive"}
+    assert refit["holdout_wape"] > floor["seasonal_naive"] * (1 + env.promotion_tolerance)
+    assert any("seasonal_naive" in r for r in refit["reasons"]) and not any("drift" in r for r in refit["reasons"])
+    assert production_version(env)["version"] == "1"
+
+    # a different model type is scored against production's type as well; seasonal naive is its own floor
+    switch = retrain(weekly, env, model_type="seasonal_naive")
+    assert switch["reference_holdout_wape"] == pytest.approx({"naive": refit["holdout_wape"]})
+    assert switch["promoted"], switch["reasons"]
 
 
 def test_a_registry_read_error_blocks_the_run(daily, env, monkeypatch):

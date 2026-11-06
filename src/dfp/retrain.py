@@ -1,6 +1,6 @@
 """The retrain job: refit the champion on the newest window, score it on a holdout, check the newest data for
-drift against the training window, compare with production's model type scored on the same holdout, and
-promote only when both gates pass. Every completed run writes reports/retrain-latest.json with the decision
+drift against the training window, compare its holdout WAPE with reference models scored on the same holdout,
+and promote only when both gates pass. Every completed run writes reports/retrain-latest.json with the decision
 and its reasons; a registry error stops the run before anything is fitted.
 """
 
@@ -83,14 +83,13 @@ def retrain(
     drift = run_drift(drift_frame(reference), drift_frame(current), reports, name="drift-latest")
 
     pooled, per_hotel = holdout_wape(daily, model_type, s.holdout_days, residuals)
-    # Production is judged on the same window: its model type fitted through the same cutoff and scored on the
-    # same days. The WAPE tagged on its version came from an older window, which may have been easier or harder.
-    if prod_type is None:
-        prod_wape = None
-    elif prod_type == model_type:
-        prod_wape = pooled
-    else:
-        prod_wape, _ = holdout_wape(daily, prod_type, s.holdout_days, residuals)
+    # References are fitted through the same cutoff and scored on the same days as the challenger: seasonal naive,
+    # the floor the backtest champion had to beat, and production's model type. A reference of the challenger's own
+    # type would be the challenger itself, so it is skipped: a refit of production's type is judged by the floor.
+    references: dict[str, float] = {}
+    for ref in ("seasonal_naive", prod_type):
+        if ref is not None and ref != model_type and ref not in references:
+            references[ref], _ = holdout_wape(daily, ref, s.holdout_days, residuals)
 
     reasons = []
     # The gate judges the columns the forecaster consumes; price and revenue drift is reported for a human.
@@ -101,15 +100,23 @@ def retrain(
         reasons.append(
             f"drift: {gate_share:.0%} of the model's input columns drifted (threshold {s.drift_share_threshold:.0%})"
         )
-    quality_ok = prod_wape is None or pooled <= prod_wape * (1 + s.promotion_tolerance)
-    if not quality_ok:
+    beaten_by = {ref: w for ref, w in references.items() if pooled > w * (1 + s.promotion_tolerance)}
+    quality_ok = not beaten_by
+    for ref, w in beaten_by.items():
         reasons.append(
-            f"holdout WAPE {pooled:.1f}% is worse than production's ({prod_type}) {prod_wape:.1f}% on the same "
-            f"window by more than {s.promotion_tolerance:.0%}"
+            f"holdout WAPE {pooled:.1f}% is worse than {ref} on the same window ({w:.1f}%) "
+            f"by more than {s.promotion_tolerance:.0%}"
         )
     promote = force_promote or (drift_ok and quality_ok)
     if force_promote and reasons:
         reasons.append("promoted anyway: --force")
+    if not reasons:
+        reasons.append(
+            f"drift below threshold and holdout WAPE within {s.promotion_tolerance:.0%} of {', '.join(references)} "
+            "on the same window"
+            if references
+            else "drift below threshold; no other model type to compare holdout WAPE with"
+        )
 
     model = fit_demand_model(daily, model_type, None, residuals)
     tags = {
@@ -145,12 +152,12 @@ def retrain(
         "model_type": model_type,
         "version": version,
         "promoted": promote,
-        "reasons": reasons or ["drift below threshold and holdout WAPE within tolerance"],
+        "reasons": reasons,
         "holdout_days": s.holdout_days,
         "holdout_wape": pooled,
         "holdout_wape_by_hotel": per_hotel,
+        "reference_holdout_wape": references,
         "production_model_type": prod_type,
-        "production_holdout_wape": prod_wape,
         "production_version_before": prod["version"] if prod else None,
         "drift": {
             "gate_columns": GATE_COLUMNS,

@@ -104,7 +104,7 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 | Elasticity | log-log OLS with fixed effects (naive) and with week-of-year, the other hotel's demand and lead time as controls; the sign diagnoses simultaneity; pricing uses a stated planning assumption with a sensitivity range (ADR 0002) |
 | A/B | switchback simulation from the hotel's own seasonality and noise, analytic and Monte Carlo power, bootstrap CI, sensitivity, and the booking-level design that would have real power (ADR 0003) |
 | Tracking | MLflow 3 runs per backtest and per (re)train; the model packaged as a pyfunc and registered with alias `production` |
-| Retrain | holdout WAPE on the last 28 days, compared with production's model type on the same days, plus Evidently data drift of the forecaster's input columns against the same weeks one year earlier; promote only when both gates pass; weekly GitHub Actions schedule (ADR 0004) |
+| Retrain | holdout WAPE on the last 28 days, compared on the same days with seasonal naive and, when the model type changes, with production's type (a refit of production's type is judged by the seasonal-naive floor), plus Evidently data drift of the forecaster's input columns against the same weeks one year earlier; promote only when both gates pass; weekly GitHub Actions schedule (ADR 0004) |
 | Serving | FastAPI with `X-API-Key`, per-key rate limit, request ids, structured logs, Prometheus metrics, model reload without restart (ADR 0005) |
 | Observability | 5 alert rules with promtool tests, Grafana dashboard, optional OpenTelemetry traces |
 | Delivery | uv-built non-root image, Compose (MLflow, API, retrain job, observability profile), Fly.io configs, Terraform for ECR + App Runner, CI with lint, types, unit, integration, pipeline, promtool, Terraform, gitleaks, pip-audit and image jobs |
@@ -141,7 +141,7 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 | Suite | Count | What |
 |---|---|---|
 | pytest unit | 32 | series construction and quality checks, metrics, feature frames, every forecaster's output, fold layout, backtest summary and champion rule, a failing model and a crashed fold, elasticity on synthetic data with a known slope, lift arithmetic, pricing curve with the flat-curve tie-break, capacity and unit cost, A/B design and analysis coherence, Monte Carlo power, drift parser, API errors and logs without credentials, keys required when none are configured, the pinned dataset hash |
-| pytest integration | 4 | first train promotes; the gate blocks a drifted window and a worse holdout, scores production on the same window, and stops on a registry read error; the API serves forecasts and prices, enforces the key, rate limits, exposes metrics, reloads |
+| pytest integration | 5 | first train promotes; the gate blocks a drifted window and a refit worse than the seasonal-naive floor, scores its references on the same window, and stops on a registry read error; the API serves forecasts and prices, enforces the key, rate limits, exposes metrics, reloads |
 | promtool | 6 scenarios | each alert fires and stays quiet when it should |
 | CI | 7 jobs | plus a pipeline job that runs data, elasticity, A/B, a short backtest, train and a blocked retrain on the real file |
 
