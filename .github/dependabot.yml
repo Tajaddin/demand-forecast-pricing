@@ -6,6 +6,8 @@ updates:
   directory: /
   schedule:
     interval: monthly
+  cooldown:
+    default-days: 7
   # A newer pyarrow does not resolve with the rest of the group and fails the whole job.
   ignore:
   - dependency-name: pyarrow
@@ -17,6 +19,8 @@ updates:
   directory: /
   schedule:
     interval: monthly
+  cooldown:
+    default-days: 7
   groups:
     docker:
       patterns:
@@ -25,6 +29,8 @@ updates:
   directory: /
   schedule:
     interval: monthly
+  cooldown:
+    default-days: 7
   groups:
     github_actions:
       patterns:
@@ -33,6 +39,8 @@ updates:
   directory: /infra/terraform
   schedule:
     interval: monthly
+  cooldown:
+    default-days: 7
   groups:
     terraform:
       patterns:
