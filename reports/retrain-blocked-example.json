@@ -1,5 +1,5 @@
 {
-  "run_utc": "2026-10-17 14:14",
+  "run_utc": "2026-11-06 06:44",
   "model_type": "sarima",
   "version": "3",
   "promoted": false,
@@ -12,7 +12,10 @@
     "City Hotel": 20.648748996633483,
     "Resort Hotel": 14.374324053901486
   },
-  "production_wape_before": 18.3981,
+  "reference_holdout_wape": {
+    "seasonal_naive": 22.829581993569132
+  },
+  "production_model_type": "sarima",
   "production_version_before": "2",
   "drift": {
     "gate_columns": [

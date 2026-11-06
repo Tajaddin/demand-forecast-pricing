@@ -91,7 +91,7 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 ### Retrain gate (`make train`, `make retrain-blocked`)
 
 <!-- RETRAIN -->
-- Latest run (2026-10-17 14:14 UTC): sarima version 2, holdout WAPE **18.4%** over the last 28 days; drift in the model's input columns 0% (all columns 38%, reference = the same weeks one year earlier); **promoted** (drift below threshold and holdout WAPE within tolerance).
+- Latest run (2026-11-06 06:43 UTC): sarima version 2, holdout WAPE **18.4%** over the last 28 days (seasonal_naive 22.8% on the same days); drift in the model's input columns 0% (all columns 38%, reference = the same weeks one year earlier); **promoted** (drift below threshold and holdout WAPE within 5% of seasonal_naive on the same window).
 - Gate demonstration with a synthetic shock in the newest window (`dfp retrain --simulate-drift`): input drift 50%, version 3 registered but **not promoted** (drift: 50% of the model's input columns drifted (threshold 30%)).
 <!-- /RETRAIN -->
 

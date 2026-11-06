@@ -40,6 +40,6 @@ because the data changed.
 - The holdout is the last 28 days of a static dataset, so locally "retrain" is a rehearsal; with live data
   the same code compares genuinely new weeks.
 - On this data the normal retrain passes (0% input drift, 38% across all columns because 2017 prices and
-  lead times differ from 2016) and the synthetic shock is blocked (50% input drift), which is the behaviour
-  a gate should have.
+  lead times differ from 2016; holdout WAPE 18.4% against 22.8% for seasonal naive on the same days) and the
+  synthetic shock is blocked (50% input drift), which is the behaviour a gate should have.
 - Evidently's report is saved as HTML next to the JSON for a human to look at.
