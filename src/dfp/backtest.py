@@ -1,7 +1,8 @@
 """Rolling-origin backtest: for each fold the models are refit on everything before the origin and asked for
 the next max(horizons) days; errors are scored per horizon window. Every model is compared with seasonal
 naive, and the champion is the model with the lowest pooled WAPE at the main horizon that beats seasonal
-naive at every horizon. If none does, seasonal naive is the champion.
+naive at every horizon. If none does, seasonal naive is the champion. A fold where a model fails is left out
+of that model's scores and flagged, and a model with any failed fold cannot be the champion.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ class FoldResult:
     abs_error_sum: float
     actual_sum: float
     fit_seconds: float
+    failed: bool
 
 
 @dataclass
@@ -91,7 +93,8 @@ def run_backtest(
                     )
                 for h in horizons:
                     y_h, yhat_h = actual[:h], yhat[:h]
-                    if np.isnan(yhat_h).any():
+                    failed = bool(np.isnan(yhat_h).any())
+                    if failed:
                         m = {"mape": np.nan, "wape": np.nan, "smape": np.nan, "mase": np.nan}
                     else:
                         m = all_metrics(y_h, yhat_h, train.to_numpy(dtype=float), season)
@@ -102,9 +105,12 @@ def run_backtest(
                             fold=fold,
                             origin=str(y.index[origin].date()),
                             horizon=h,
-                            abs_error_sum=float(np.nansum(np.abs(y_h - yhat_h))),
-                            actual_sum=float(np.abs(y_h).sum()),
+                            # NaN for a failed fold on both sides, so the pooled sums skip it instead of
+                            # counting its actuals with zero error
+                            abs_error_sum=float(np.abs(y_h - yhat_h).sum()),
+                            actual_sum=np.nan if failed else float(np.abs(y_h).sum()),
                             fit_seconds=seconds,
+                            failed=failed,
                             **m,
                         )
                     )
@@ -124,6 +130,7 @@ def summarise(results: pd.DataFrame, main_horizon: int = MAIN_HORIZON) -> dict:
             abs_error_sum=("abs_error_sum", "sum"),
             actual_sum=("actual_sum", "sum"),
             folds=("fold", "nunique"),
+            failed_folds=("failed", "sum"),
             fit_seconds=("fit_seconds", "mean"),
         )
         .reset_index()
@@ -143,6 +150,7 @@ def summarise(results: pd.DataFrame, main_horizon: int = MAIN_HORIZON) -> dict:
             actual_sum=("actual_sum", "sum"),
             mape=("mape", "mean"),
             mase=("mase", "mean"),
+            failed_folds=("failed", "sum"),
         )
         .reset_index()
     )
@@ -154,8 +162,8 @@ def summarise(results: pd.DataFrame, main_horizon: int = MAIN_HORIZON) -> dict:
     pooled["wape_vs_snaive"] = pooled["wape_pooled"] / pooled["snaive_wape"]
     pooled["beats_snaive"] = pooled["wape_pooled"] < pooled["snaive_wape"]
 
-    beats_all = pooled.groupby("model")["beats_snaive"].all()
-    candidates = pooled[(pooled["horizon"] == main_horizon) & pooled["model"].map(beats_all)]
+    eligible = pooled.groupby("model")["beats_snaive"].all() & pooled.groupby("model")["failed_folds"].sum().eq(0)
+    candidates = pooled[(pooled["horizon"] == main_horizon) & pooled["model"].map(eligible)]
     champion = str(candidates.sort_values("wape_pooled").iloc[0]["model"]) if len(candidates) else "seasonal_naive"
     return {
         "main_horizon": main_horizon,
@@ -189,6 +197,8 @@ def write_reports(output: BacktestOutput, summary: dict, out_dir: Path, meta: di
         lines.append(
             f"| {r['model']} | {int(r['horizon'])} | {r['wape_pooled']:.1f}% | {r['wape_vs_snaive']:.2f}x | {r['mape']:.1f}% | {r['mase']:.2f} | {'yes' if r['beats_snaive'] else 'no'} |"
         )
+    for model, n in pooled[pooled["failed_folds"] > 0].groupby("model")["failed_folds"].max().items():
+        lines += ["", f"{model} failed on {int(n)} hotel-fold(s): scored on the others, not eligible as champion."]
     by_hotel = pd.DataFrame(summary["by_hotel"])
     for hotel in sorted(by_hotel["hotel"].unique()):
         lines += [

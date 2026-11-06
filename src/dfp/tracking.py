@@ -83,8 +83,8 @@ def residual_quantiles_from_backtest(residuals: pd.DataFrame, model_type: str) -
     sub = residuals[residuals["model"] == model_type]
     for (hotel, step), g in sub.groupby(["hotel", "step"]):
         out.setdefault(str(hotel), {})[str(int(str(step)))] = [
-            float(np.percentile(g["error"], 10)),
-            float(np.percentile(g["error"], 90)),
+            float(np.nanpercentile(g["error"], 10)),
+            float(np.nanpercentile(g["error"], 90)),
         ]
     return out
 
