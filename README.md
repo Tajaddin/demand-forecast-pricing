@@ -14,7 +14,7 @@ FastAPI, Prometheus, Docker Compose, Fly.io, Terraform (AWS App Runner), GitHub 
 Hotel booking demand dataset (Antonio, de Almeida and Nunes, *Data in Brief* 22, 2019, CC BY 4.0): 119,390
 bookings at a city hotel and a resort hotel in Portugal, arrivals 2015-07-01 to 2017-08-31, with arrival
 date, nights, guests, market segment, average daily rate (ADR) and cancellation. `scripts/download_data.py`
-fetches it from the TidyTuesday mirror; no account. From it: daily arrivals, room-nights, revenue and mean
+fetches it from the TidyTuesday mirror at a pinned commit and checks its sha256; no account. From it: daily arrivals, room-nights, revenue and mean
 ADR per hotel (793 days each), and a weekly hotel x segment panel for the elasticity work.
 
 ## Architecture
