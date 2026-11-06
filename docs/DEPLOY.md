@@ -65,13 +65,15 @@ curl -X POST https://dfp-api.fly.dev/model/reload -H "X-API-Key: ..."
 ## AWS App Runner (Terraform)
 
 ```bash
-cd infra/terraform && cp terraform.tfvars.example terraform.tfvars   # MLflow URL, API keys
+cd infra/terraform && cp terraform.tfvars.example terraform.tfvars   # MLflow URL and login, API keys
 terraform init && terraform apply                                     # ECR repo, App Runner service, SSM secrets
 aws ecr get-login-password | docker login --username AWS --password-stdin "$(terraform output -raw ecr_repository_url | cut -d/ -f1)"
 docker build -t "$(terraform output -raw ecr_repository_url):0.1.0" .. && docker push "$(terraform output -raw ecr_repository_url):0.1.0"
 ```
 
-App Runner redeploys on push (auto deployments). Smallest size, about $5 a month while it runs.
+App Runner redeploys on push (auto deployments). Smallest size, about $5 a month while it runs. The MLflow
+user and password reach the service as `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` from SSM,
+like the other secrets; leave `mlflow_tracking_username` empty for a server without basic auth.
 
 ## Teardown
 
