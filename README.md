@@ -140,8 +140,8 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 
 | Suite | Count | What |
 |---|---|---|
-| pytest unit | 20 | series construction and quality checks, metrics, feature frames, every forecaster's output, fold layout, backtest summary and champion rule, a failing model, elasticity on synthetic data with a known slope, lift arithmetic, pricing curve, A/B design and analysis coherence, Monte Carlo power, drift parser |
-| pytest integration | 2 | first train promotes; the gate blocks a drifted window and a worse holdout; the API serves forecasts and prices, enforces the key, rate limits, exposes metrics, reloads |
+| pytest unit | 32 | series construction and quality checks, metrics, feature frames, every forecaster's output, fold layout, backtest summary and champion rule, a failing model and a crashed fold, elasticity on synthetic data with a known slope, lift arithmetic, pricing curve with the flat-curve tie-break, capacity and unit cost, A/B design and analysis coherence, Monte Carlo power, drift parser, API errors and logs without credentials, keys required when none are configured, the pinned dataset hash |
+| pytest integration | 4 | first train promotes; the gate blocks a drifted window and a worse holdout, scores production on the same window, and stops on a registry read error; the API serves forecasts and prices, enforces the key, rate limits, exposes metrics, reloads |
 | promtool | 6 scenarios | each alert fires and stays quiet when it should |
 | CI | 7 jobs | plus a pipeline job that runs data, elasticity, A/B, a short backtest, train and a blocked retrain on the real file |
 
