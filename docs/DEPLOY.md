@@ -11,6 +11,7 @@ make data elasticity ab                # reports/data-quality.json, elasticity.*
 make backtest                          # reports/backtest.md (a few minutes)
 make train                             # registers the champion, alias production
 make retrain-blocked                   # demonstrates the gate
+export DFP_API_KEYS=dev-key            # with no key set, the keyed routes refuse every request
 make serve                             # http://localhost:8100/docs
 ```
 
