@@ -57,6 +57,8 @@ class PriceRequest(BaseModel):
 
 log = get_logger("api")
 
+MODEL_UNAVAILABLE = "no production model loaded; the service log has the cause"
+
 
 class ModelState:
     model = None
@@ -73,7 +75,8 @@ class ModelState:
             MODEL_VERSION.set(int(cls.info["version"]) if cls.info else 0)
             log.info("model loaded", version=cls.info["version"] if cls.info else None)
         except Exception as exc:
-            cls.model, cls.info, cls.error = None, None, str(exc)
+            # The exception text can carry the tracking URI, credentials included: it goes to the log only.
+            cls.model, cls.info, cls.error = None, None, MODEL_UNAVAILABLE
             MODEL_LOADED.set(0)
             log.warning("no production model loaded", error=str(exc)[:200])
 

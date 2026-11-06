@@ -1,9 +1,24 @@
 from __future__ import annotations
 
 import logging
+import re
 import sys
+from collections.abc import MutableMapping
+from typing import Any
 
 import structlog
+
+_URL_CREDENTIALS = re.compile(r"(?<=://)[^/\s@]+@")
+
+
+def redact_url_credentials(
+    _logger: Any, _method: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
+    """Masks user:password@ in any URL inside a string field, e.g. a tracking URI quoted in an MLflow error."""
+    for key, value in event_dict.items():
+        if isinstance(value, str):
+            event_dict[key] = _URL_CREDENTIALS.sub("***@", value)
+    return event_dict
 
 
 def configure_logging(level: str = "INFO", service: str = "dfp") -> None:
@@ -18,6 +33,7 @@ def configure_logging(level: str = "INFO", service: str = "dfp") -> None:
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
+            redact_url_credentials,
             structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(logging.getLevelName(level.upper())),
