@@ -56,3 +56,29 @@ def test_log_lines_drop_credentials_from_urls():
     out = redact_url_credentials(None, "warning", event)
     assert out["error"] == "API request to http://***@127.0.0.1:9/api/2.0 failed"
     assert out["n"] == 3
+
+
+def test_keyed_routes_refuse_requests_when_no_keys_are_configured(no_registry, monkeypatch):
+    monkeypatch.setenv("DFP_API_KEYS", "")
+    reset_settings_cache()
+    with _client() as client:
+        assert client.post("/model/reload").status_code == 401
+        assert client.post("/model/reload", headers={"X-API-Key": ""}).status_code == 401
+        assert client.get("/forecast", params={"hotel": "City Hotel"}).status_code == 401
+        price = client.post("/price/recommend", json={"hotel": "City Hotel", "base_adr": 100, "expected_demand": 10})
+        assert price.status_code == 401
+        assert client.get("/health").status_code == 503  # health and metrics stay open
+
+    monkeypatch.setenv("DFP_ALLOW_UNAUTHENTICATED", "true")
+    reset_settings_cache()
+    with _client() as client:
+        assert client.post("/model/reload").status_code == 200
+
+
+def test_the_development_flag_does_not_open_a_keyed_service(no_registry, monkeypatch):
+    monkeypatch.setenv("DFP_API_KEYS", "test-key")
+    monkeypatch.setenv("DFP_ALLOW_UNAUTHENTICATED", "true")
+    reset_settings_cache()
+    with _client() as client:
+        assert client.post("/model/reload").status_code == 401
+        assert client.post("/model/reload", headers={"X-API-Key": "test-key"}).status_code == 200

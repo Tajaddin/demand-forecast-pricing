@@ -85,6 +85,11 @@ class ModelState:
 async def lifespan(app: FastAPI):
     s = settings()
     configure_logging(s.log_level, service="api")
+    if not s.api_key_set:
+        if s.allow_unauthenticated:
+            log.warning("no API keys configured and DFP_ALLOW_UNAUTHENTICATED is set: the keyed routes are open")
+        else:
+            log.warning("no API keys configured: /forecast, /price/recommend and /model/reload refuse every request")
     if s.otel_exporter_otlp_endpoint:
         _setup_tracing(app, s)
     ModelState.load(s)
@@ -143,8 +148,10 @@ def create_app() -> FastAPI:
         return response
 
     def require_key(x_api_key: Annotated[str | None, Header()] = None) -> None:
-        keys = settings().api_key_set
-        if keys and x_api_key not in keys:
+        s = settings()
+        if not s.api_key_set and s.allow_unauthenticated:
+            return
+        if x_api_key not in s.api_key_set:
             raise HTTPException(status_code=401, detail="missing or invalid X-API-Key")
 
     @app.get("/health")

@@ -115,12 +115,14 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 uv sync --extra dev
 docker compose up -d mlflow && export MLFLOW_TRACKING_URI=http://localhost:5002
 make data elasticity ab backtest train      # reports/*.md and the registry
+export DFP_API_KEYS=dev-key                 # with no key set, the keyed routes refuse every request
 make serve                                  # http://localhost:8100/docs
 ```
 
 ```bash
-curl "http://localhost:8100/forecast?hotel=City%20Hotel&horizon=7"
-curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application/json" -d '{"hotel":"City Hotel","base_adr":120}'
+curl "http://localhost:8100/forecast?hotel=City%20Hotel&horizon=7" -H "X-API-Key: $DFP_API_KEYS"
+curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application/json" -H "X-API-Key: $DFP_API_KEYS" \
+  -d '{"hotel":"City Hotel","base_adr":120}'
 ```
 
 `docs/DEPLOY.md` covers the container stack, the scheduled retrain, Fly.io and the App Runner Terraform.
