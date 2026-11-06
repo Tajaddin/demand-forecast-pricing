@@ -76,7 +76,7 @@ def test_backtest_scores_every_model_and_picks_a_champion(daily, tmp_path):
     assert "seasonal naive" in mp.read_text(encoding="utf-8")
 
 
-def test_a_failing_model_does_not_stop_the_backtest(daily):
+def test_a_failing_model_does_not_stop_the_backtest(daily, tmp_path):
     class Broken:
         name = "broken"
 
@@ -90,6 +90,14 @@ def test_a_failing_model_does_not_stop_the_backtest(daily):
     broken = out.results[out.results["model"] == "broken"]
     assert broken["wape"].isna().all()
     assert out.results[out.results["model"] == "seasonal_naive"]["wape"].notna().all()
+
+    meta = {"n_folds": 2, "step_days": 7, "horizons": [7], "first_day": "x", "last_day": "y"}
+    _, md = write_reports(
+        out, summarise(out.results, main_horizon=7), tmp_path, meta | {"first_origin": "a", "last_origin": "b"}
+    )
+    text = md.read_text(encoding="utf-8")
+    assert "nan" not in text and "| broken |" not in text
+    assert "broken failed on every hotel-fold (4): no scores" in text
 
 
 def test_a_crashed_fold_is_excluded_not_scored_as_perfect(daily):

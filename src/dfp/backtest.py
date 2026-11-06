@@ -193,12 +193,16 @@ def write_reports(output: BacktestOutput, summary: dict, out_dir: Path, meta: di
         "| Model | h | WAPE | vs seasonal naive | MAPE | MASE | beats seasonal naive |",
         "|---|---|---|---|---|---|---|",
     ]
-    for _, r in pooled.sort_values(["horizon", "wape_pooled"]).iterrows():
+    for _, r in pooled.dropna(subset=["wape_pooled"]).sort_values(["horizon", "wape_pooled"]).iterrows():
         lines.append(
             f"| {r['model']} | {int(r['horizon'])} | {r['wape_pooled']:.1f}% | {r['wape_vs_snaive']:.2f}x | {r['mape']:.1f}% | {r['mase']:.2f} | {'yes' if r['beats_snaive'] else 'no'} |"
         )
-    for model, n in pooled[pooled["failed_folds"] > 0].groupby("model")["failed_folds"].max().items():
-        lines += ["", f"{model} failed on {int(n)} hotel-fold(s): scored on the others, not eligible as champion."]
+    for model, g in pooled[pooled["failed_folds"] > 0].groupby("model"):
+        n = int(g["failed_folds"].max())
+        if g["wape_pooled"].isna().all():
+            lines += ["", f"{model} failed on every hotel-fold ({n}): no scores, left out of the tables."]
+        else:
+            lines += ["", f"{model} failed on {n} hotel-fold(s): scored on the others, not eligible as champion."]
     by_hotel = pd.DataFrame(summary["by_hotel"])
     for hotel in sorted(by_hotel["hotel"].unique()):
         lines += [
@@ -208,7 +212,9 @@ def write_reports(output: BacktestOutput, summary: dict, out_dir: Path, meta: di
             "| Model | h | WAPE (pooled) | WAPE (mean of folds) | vs seasonal naive | MAPE | MASE | fit s |",
             "|---|---|---|---|---|---|---|---|",
         ]
-        sub = by_hotel[by_hotel["hotel"] == hotel].sort_values(["horizon", "wape_pooled"])
+        sub = (
+            by_hotel[by_hotel["hotel"] == hotel].dropna(subset=["wape_pooled"]).sort_values(["horizon", "wape_pooled"])
+        )
         for _, r in sub.iterrows():
             lines.append(
                 f"| {r['model']} | {int(r['horizon'])} | {r['wape_pooled']:.1f}% | {r['wape_mean']:.1f}% | {r['wape_vs_snaive']:.2f}x | {r['mape']:.1f}% | {r['mase']:.2f} | {r['fit_seconds']:.2f} |"
