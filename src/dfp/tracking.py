@@ -13,6 +13,8 @@ import mlflow
 import numpy as np
 import pandas as pd
 from mlflow import MlflowClient
+from mlflow.exceptions import MlflowException
+from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST, ErrorCode
 from mlflow.pyfunc import PythonModel
 
 from dfp.config import Settings
@@ -146,11 +148,19 @@ def set_production(s: Settings, version: str) -> None:
 
 
 def production_version(s: Settings) -> dict | None:
-    client = MlflowClient()
+    """The version behind the alias, or None while the model or the alias does not exist. Any other registry
+    error propagates: an unreachable registry must not pass for an empty one."""
+    client = MlflowClient(s.mlflow_tracking_uri)
     try:
-        mv = client.get_model_version_by_alias(s.model_name, s.model_alias)
-    except Exception:
+        registered = client.get_registered_model(s.model_name)
+    except MlflowException as exc:
+        if exc.error_code == ErrorCode.Name(RESOURCE_DOES_NOT_EXIST):
+            return None
+        raise
+    version = registered.aliases.get(s.model_alias)
+    if version is None:
         return None
+    mv = client.get_model_version(s.model_name, str(version))
     return {"version": str(mv.version), "run_id": mv.run_id, "tags": dict(mv.tags), "created": mv.creation_timestamp}
 
 

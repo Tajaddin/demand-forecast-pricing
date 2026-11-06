@@ -5,11 +5,16 @@ from __future__ import annotations
 
 import json
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
+from mlflow import MlflowClient
+from mlflow.exceptions import MlflowException
 
 from dfp.config import Settings, reset_settings_cache
-from dfp.retrain import retrain
+from dfp.data import HOTELS
+from dfp.retrain import holdout_wape, retrain
+from dfp.tracking import production_version
 
 pytestmark = pytest.mark.integration
 
@@ -42,6 +47,55 @@ def test_first_train_promotes_then_the_gate_blocks_a_drifted_window(daily, env):
     gated = retrain(daily, worse, model_type="seasonal_naive")
     assert not gated["promoted"]
     assert any("WAPE" in r for r in gated["reasons"])
+
+
+def _harder_newest_weeks(daily, days):
+    """Alternating +50% and -50% days in the newest window: every model forecasts it worse."""
+    out = daily.copy()
+    newest = out["arrival_date"] > out["arrival_date"].max() - np.timedelta64(days, "D")
+    for hotel in HOTELS:
+        idx = out.index[newest & (out["hotel"] == hotel)]
+        out.loc[idx, "arrivals"] = out.loc[idx, "arrivals"] * np.where(np.arange(len(idx)) % 2 == 0, 1.5, 0.5)
+    return out
+
+
+def test_the_gate_scores_production_on_the_same_window(daily, env):
+    drifted = retrain(daily, env, simulate_drift=True, model_type="seasonal_naive")
+    assert not drifted["promoted"] and production_version(env) is None  # a version, but no alias yet
+
+    first = retrain(daily, env, force_promote=True, model_type="seasonal_naive")
+    hard = retrain(_harder_newest_weeks(daily, env.holdout_days), env, model_type="seasonal_naive")
+    # the newest weeks are much harder than the window production was first scored on; that is not the
+    # challenger's fault, and the same model type scored on the same window does no better
+    assert hard["holdout_wape"] > first["holdout_wape"] * (1 + env.promotion_tolerance)
+    assert not any("worse than production" in r for r in hard["reasons"]), hard["reasons"]
+    assert hard["production_holdout_wape"] == pytest.approx(hard["holdout_wape"])
+
+    challenger = retrain(daily, env, model_type="naive")
+    assert challenger["production_model_type"] == "seasonal_naive"
+    expected, _ = holdout_wape(daily, "seasonal_naive", env.holdout_days, None)
+    assert challenger["production_holdout_wape"] == pytest.approx(expected)
+
+
+def test_a_registry_read_error_blocks_the_run(daily, env, monkeypatch):
+    retrain(daily, env, force_promote=True, model_type="seasonal_naive")
+    failed = []
+
+    def first_read_fails(original):
+        def call(self, *args, **kwargs):
+            if not failed:
+                failed.append(original.__name__)
+                raise MlflowException("registry temporarily unavailable", error_code="TEMPORARILY_UNAVAILABLE")
+            return original(self, *args, **kwargs)
+
+        return call
+
+    with monkeypatch.context() as m:
+        for name in ("get_registered_model", "get_model_version_by_alias"):
+            m.setattr(MlflowClient, name, first_read_fails(getattr(MlflowClient, name)))
+        with pytest.raises(MlflowException, match="temporarily unavailable"):
+            retrain(daily, env, model_type="seasonal_naive")
+    assert failed and production_version(env)["version"] == "1"
 
 
 def test_api_serves_forecasts_prices_and_enforces_key_and_rate_limit(daily, env):

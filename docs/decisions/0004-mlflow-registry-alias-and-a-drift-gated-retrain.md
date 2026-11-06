@@ -19,8 +19,10 @@ because the data changed.
   ordinary seasonality as drift in the first version). The gate judges only the columns the forecaster
   consumes (arrivals, room-nights, cancellations, weekday); drift in prices, revenue and lead time is reported
   for a human but does not block, because the arrivals model does not read them. **Promote only if** the
-  input-column drift share < 30% **and** holdout WAPE is not worse than production by more than 5%
-  relative. Every run registers a version and writes `reports/retrain-latest.json` with the decision and its
+  input-column drift share < 30% **and** holdout WAPE is not worse than production's by more than 5%
+  relative, where production's WAPE comes from its model type fitted through the same cutoff and scored on
+  the same 28 days (the WAPE stored with an older version was measured on a different window). The registry
+  is read first; any error other than "no model or alias yet" stops the run. Every run registers a version and writes `reports/retrain-latest.json` with the decision and its
   reasons; a blocked run leaves the alias alone.
 - `dfp retrain --simulate-drift` injects a synthetic shock into the newest window so the blocked path is
   exercised and recorded (`reports/retrain-blocked-example.json`); the integration test covers both paths.

@@ -104,7 +104,7 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 | Elasticity | log-log OLS with fixed effects (naive) and with week-of-year, the other hotel's demand and lead time as controls; the sign diagnoses simultaneity; pricing uses a stated planning assumption with a sensitivity range (ADR 0002) |
 | A/B | switchback simulation from the hotel's own seasonality and noise, analytic and Monte Carlo power, bootstrap CI, sensitivity, and the booking-level design that would have real power (ADR 0003) |
 | Tracking | MLflow 3 runs per backtest and per (re)train; the model packaged as a pyfunc and registered with alias `production` |
-| Retrain | holdout WAPE on the last 28 days plus Evidently data drift of the forecaster's input columns against the same weeks one year earlier; promote only when both gates pass; weekly GitHub Actions schedule (ADR 0004) |
+| Retrain | holdout WAPE on the last 28 days, compared with production's model type on the same days, plus Evidently data drift of the forecaster's input columns against the same weeks one year earlier; promote only when both gates pass; weekly GitHub Actions schedule (ADR 0004) |
 | Serving | FastAPI with `X-API-Key`, per-key rate limit, request ids, structured logs, Prometheus metrics, model reload without restart (ADR 0005) |
 | Observability | 5 alert rules with promtool tests, Grafana dashboard, optional OpenTelemetry traces |
 | Delivery | uv-built non-root image, Compose (MLflow, API, retrain job, observability profile), Fly.io configs, Terraform for ECR + App Runner, CI with lint, types, unit, integration, pipeline, promtool, Terraform, gitleaks, pip-audit and image jobs |
