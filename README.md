@@ -132,7 +132,7 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 | Method and path | Does |
 |---|---|
 | `GET /forecast?hotel=&horizon=` | next 1 to 28 days from the production model with 10/90 intervals (key, rate limited) |
-| `POST /price/recommend` | revenue-maximising price within a band for a date, from the forecast and the planning elasticity (or values you pass); the response names the elasticity's source |
+| `POST /price/recommend` | revenue-maximising price within a band for a date, from the forecast and the planning elasticity (or values you pass); optional `capacity` caps rooms sold and `unit_cost` turns it into profit; a flat curve (unit elasticity) recommends no change; the response names the elasticity's source |
 | `GET /model`, `POST /model/reload` | registry version in use; reload after a promotion |
 | `GET /health`, `GET /metrics` | 503 while no production model is loaded; Prometheus metrics |
 

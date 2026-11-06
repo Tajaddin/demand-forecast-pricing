@@ -23,7 +23,7 @@ from dfp.config import Settings, settings
 from dfp.data import HOTELS
 from dfp.elasticity import load_elasticity
 from dfp.logging_setup import configure_logging, get_logger
-from dfp.pricing import recommend_price
+from dfp.pricing import Recommendation, recommend_price
 from dfp.tracking import load_production_model, production_version
 
 REQUESTS = Histogram(
@@ -53,6 +53,8 @@ class PriceRequest(BaseModel):
     elasticity: float | None = Field(default=None, description="Overrides the estimate from the data")
     min_change: float = Field(default=-0.3, ge=-0.9, le=0)
     max_change: float = Field(default=0.3, ge=0, le=2)
+    capacity: float | None = Field(default=None, gt=0, description="Rooms available; demand above it is not sold")
+    unit_cost: float = Field(default=0, ge=0, description="Variable cost per room sold; 0 maximises revenue")
 
 
 log = get_logger("api")
@@ -110,6 +112,21 @@ def _setup_tracing(app: FastAPI, s: Settings) -> None:
     )
     trace.set_tracer_provider(provider)
     FastAPIInstrumentor.instrument_app(app)
+
+
+def _price_note(rec: Recommendation, min_change: float, max_change: float, unit_cost: float) -> str:
+    objective = "profit" if unit_cost else "revenue"
+    if rec.flat:
+        return (
+            f"expected {objective} is the same at every price in the allowed range, so the recommendation is no change"
+        )
+    if rec.inelastic and rec.recommended_change >= max_change - 1e-9:
+        return "demand is inelastic in this range, so revenue rises with price up to the allowed maximum"
+    if rec.recommended_change >= max_change - 1e-9:
+        return f"expected {objective} is highest at the allowed maximum"
+    if rec.recommended_change <= min_change + 1e-9:
+        return f"expected {objective} is highest at the allowed minimum"
+    return "interior optimum within the allowed range"
 
 
 def create_app() -> FastAPI:
@@ -224,7 +241,14 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=400, detail="date must be within the next 28 days")
             demand = float(row.iloc[0]["yhat"])
             date_used = str(row.iloc[0]["date"])
-        rec = recommend_price(body.base_adr, demand, elasticity, bounds=(1 + body.min_change, 1 + body.max_change))
+        rec = recommend_price(
+            body.base_adr,
+            demand,
+            elasticity,
+            bounds=(1 + body.min_change, 1 + body.max_change),
+            capacity=body.capacity,
+            unit_cost=body.unit_cost,
+        )
         RECOMMENDATIONS.labels(body.hotel).inc()
         return {
             "hotel": body.hotel,
@@ -235,16 +259,16 @@ def create_app() -> FastAPI:
             "recommended_price": round(rec.recommended_price, 2),
             "recommended_change": round(rec.recommended_change, 3),
             "expected_revenue_change": round(rec.revenue_change_vs_base, 4),
+            "expected_profit": round(rec.expected_profit, 2),
             "inelastic": rec.inelastic,
-            "note": "demand is inelastic in this range, so revenue rises with price up to the allowed maximum"
-            if rec.inelastic
-            else "interior optimum within the allowed range",
+            "note": _price_note(rec, body.min_change, body.max_change, body.unit_cost),
             "curve": [
                 {
                     "change": round(p.change, 3),
                     "price": round(p.price, 2),
                     "demand": round(p.expected_demand, 2),
                     "revenue": round(p.expected_revenue, 2),
+                    "profit": round(p.expected_profit, 2),
                 }
                 for p in rec.curve
             ],

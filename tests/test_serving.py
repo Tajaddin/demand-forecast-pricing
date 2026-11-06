@@ -82,3 +82,19 @@ def test_the_development_flag_does_not_open_a_keyed_service(no_registry, monkeyp
     with _client() as client:
         assert client.post("/model/reload").status_code == 401
         assert client.post("/model/reload", headers={"X-API-Key": "test-key"}).status_code == 200
+
+
+def test_price_endpoint_recommends_no_change_at_the_default_elasticity(no_registry, monkeypatch):
+    monkeypatch.setenv("DFP_API_KEYS", "test-key")
+    reset_settings_cache()
+    with _client() as client:
+        r = client.post(
+            "/price/recommend",
+            json={"hotel": "City Hotel", "base_adr": 120, "expected_demand": 37.3},
+            headers={"X-API-Key": "test-key"},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["elasticity"] == -1.0 and body["elasticity_source"].startswith("default")
+    assert body["recommended_change"] == 0.0 and body["recommended_price"] == 120
+    assert "no change" in body["note"]

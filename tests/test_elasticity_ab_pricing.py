@@ -59,6 +59,35 @@ def test_price_recommendation_follows_elasticity():
         recommend_price(0, 10, -1)
 
 
+@pytest.mark.parametrize(("base", "demand"), [(100.0, 50.0), (120.0, 37.3), (87.5, 61.0)])
+def test_flat_revenue_recommends_no_change(base, demand):
+    # unit elasticity, the planning default: revenue is the same at every price, up to rounding noise
+    rec = recommend_price(base, demand, -1.0)
+    assert rec.flat
+    assert rec.recommended_change == 0.0 and rec.recommended_price == base
+    assert rec.expected_revenue == pytest.approx(base * demand)
+    asymmetric = recommend_price(base, demand, -1.0, bounds=(0.85, 1.4))
+    assert asymmetric.recommended_change == 0.0 and len(asymmetric.curve) == 62
+
+
+def test_capacity_and_unit_cost_shape_the_optimum():
+    # 50 rooms wanted at 100, 40 available: raising the price loses no revenue until demand falls to 40 at +25%,
+    # and nothing beyond that point adds revenue at unit elasticity, so the smallest such increase wins
+    capped = recommend_price(100, 50, -1.0, capacity=40)
+    assert not capped.flat
+    assert capped.recommended_change == pytest.approx(0.25)
+    assert capped.expected_demand == pytest.approx(40)
+    assert capped.revenue_change_vs_base == pytest.approx(0.25)
+
+    # elastic demand with a cost per room sold: the profit optimum is cost * e / (1 + e) = 2 * 55 = 110
+    costed = recommend_price(100, 50, -2.0, unit_cost=55)
+    assert costed.recommended_change == pytest.approx(0.10)
+    assert costed.expected_profit == pytest.approx((110 - 55) * 50 * 1.1**-2)
+    assert recommend_price(100, 50, -2.0).recommended_change == pytest.approx(-0.3)  # no cost: lowest price
+    with pytest.raises(ValueError, match="capacity"):
+        recommend_price(100, 50, -1.0, capacity=0)
+
+
 def test_ab_design_simulation_and_analysis_are_coherent(daily, bookings, tmp_path):
     base = baseline_from_history(daily, bookings, "City Hotel")
     assert set(base.weekday_demand) == set(range(7))
