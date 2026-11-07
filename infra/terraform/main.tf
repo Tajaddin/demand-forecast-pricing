@@ -73,10 +73,14 @@ resource "aws_apprunner_service" "api" {
           DFP_RATE_LIMIT  = var.rate_limit
           DFP_REPORTS_DIR = "/app/reports"
         }
-        runtime_environment_secrets = {
-          MLFLOW_TRACKING_URI = aws_ssm_parameter.mlflow_uri.arn
-          DFP_API_KEYS        = aws_ssm_parameter.api_keys.arn
-        }
+        runtime_environment_secrets = merge(
+          {
+            MLFLOW_TRACKING_URI = aws_ssm_parameter.mlflow_uri.arn
+            DFP_API_KEYS        = aws_ssm_parameter.api_keys.arn
+          },
+          { for p in aws_ssm_parameter.mlflow_username : "MLFLOW_TRACKING_USERNAME" => p.arn },
+          { for p in aws_ssm_parameter.mlflow_password : "MLFLOW_TRACKING_PASSWORD" => p.arn },
+        )
       }
     }
   }
@@ -109,6 +113,21 @@ resource "aws_ssm_parameter" "api_keys" {
   value = var.api_keys
 }
 
+// MLflow reads basic auth from these two variables, so the credentials stay out of the URI its errors quote.
+resource "aws_ssm_parameter" "mlflow_username" {
+  count = var.mlflow_tracking_username == "" ? 0 : 1
+  name  = "/${var.name}/mlflow-tracking-username"
+  type  = "SecureString"
+  value = var.mlflow_tracking_username
+}
+
+resource "aws_ssm_parameter" "mlflow_password" {
+  count = var.mlflow_tracking_username == "" ? 0 : 1
+  name  = "/${var.name}/mlflow-tracking-password"
+  type  = "SecureString"
+  value = var.mlflow_tracking_password
+}
+
 data "aws_iam_policy_document" "instance_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -126,8 +145,12 @@ resource "aws_iam_role" "apprunner_instance" {
 
 data "aws_iam_policy_document" "read_params" {
   statement {
-    actions   = ["ssm:GetParameters", "ssm:GetParameter"]
-    resources = [aws_ssm_parameter.mlflow_uri.arn, aws_ssm_parameter.api_keys.arn]
+    actions = ["ssm:GetParameters", "ssm:GetParameter"]
+    resources = concat(
+      [aws_ssm_parameter.mlflow_uri.arn, aws_ssm_parameter.api_keys.arn],
+      aws_ssm_parameter.mlflow_username[*].arn,
+      aws_ssm_parameter.mlflow_password[*].arn,
+    )
   }
 }
 

@@ -1,8 +1,9 @@
 name: retrain
 
-# Weekly retrain with the drift gate against the production MLflow (MLFLOW_TRACKING_URI secret, including
-# basic-auth credentials if the server has them). Without that secret it uses a throwaway SQLite store, so the
-# gates still run and nothing is registered. The run's reports are kept as an artifact either way.
+# Weekly retrain with the drift gate against the production MLflow (MLFLOW_TRACKING_URI secret, plus
+# MLFLOW_TRACKING_USERNAME and MLFLOW_TRACKING_PASSWORD if the server has basic auth). Without the URI secret
+# it uses a throwaway SQLite store, so the gates still run and nothing is registered. The run's reports are
+# kept as an artifact either way.
 on:
   schedule:
     - cron: "0 6 * * 1"
@@ -22,13 +23,17 @@ jobs:
     environment: production
     env:
       MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'sqlite:///mlflow.db' }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with: { version: "0.10.4", enable-cache: true }
       - run: uv sync
       - run: uv run dfp data
       - run: uv run dfp retrain ${{ inputs.simulate_drift && '--simulate-drift' || '' }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with: { name: retrain-reports, path: reports, retention-days: 30 }

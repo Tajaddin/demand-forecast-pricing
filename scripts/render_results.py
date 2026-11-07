@@ -127,9 +127,12 @@ def retrain_md() -> str:
     if not ok:
         return "(no retrain run yet: `make train`)\n"
     d = ok["drift"]
+    refs = ", ".join(f"{m} {w:.1f}%" for m, w in ok.get("reference_holdout_wape", {}).items())
+    vs = f" ({refs} on the same days)" if refs else ""
     lines = [
         f"- Latest run ({ok['run_utc']} UTC): {ok['model_type']} version {ok['version']}, holdout WAPE **{ok['holdout_wape']:.1f}%** "
-        f"over the last {ok['holdout_days']} days; drift in the model's input columns {d['gate_drifted_share']:.0%} "
+        f"over the last {ok['holdout_days']} days{vs}; "
+        f"drift in the model's input columns {d['gate_drifted_share']:.0%} "
         f"(all columns {d['drifted_share']:.0%}, reference = the same weeks one year earlier); "
         f"**{'promoted' if ok['promoted'] else 'blocked'}** ({'; '.join(ok['reasons'])}).",
     ]

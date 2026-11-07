@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     model_alias: str = "production"
 
     # serving
-    api_keys: str = ""  # comma-separated; empty = open (local development only)
+    api_keys: str = ""  # comma-separated; empty = the keyed routes refuse every request
+    allow_unauthenticated: bool = False  # local development: with no keys configured, the keyed routes are open
     rate_limit: str = "60/minute"
     log_level: str = "INFO"
     otel_exporter_otlp_endpoint: str = Field(

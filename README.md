@@ -14,8 +14,9 @@ FastAPI, Prometheus, Docker Compose, Fly.io, Terraform (AWS App Runner), GitHub 
 Hotel booking demand dataset (Antonio, de Almeida and Nunes, *Data in Brief* 22, 2019, CC BY 4.0): 119,390
 bookings at a city hotel and a resort hotel in Portugal, arrivals 2015-07-01 to 2017-08-31, with arrival
 date, nights, guests, market segment, average daily rate (ADR) and cancellation. `scripts/download_data.py`
-fetches it from the TidyTuesday mirror; no account. From it: daily arrivals, room-nights, revenue and mean
-ADR per hotel (793 days each), and a weekly hotel x segment panel for the elasticity work.
+fetches it from the TidyTuesday mirror at a pinned commit and checks its sha256; no account. From it: daily
+arrivals, room-nights, revenue and mean ADR per hotel (793 days each), and a weekly hotel x segment panel for
+the elasticity work.
 
 ## Architecture
 
@@ -90,7 +91,7 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 ### Retrain gate (`make train`, `make retrain-blocked`)
 
 <!-- RETRAIN -->
-- Latest run (2026-10-17 14:14 UTC): sarima version 2, holdout WAPE **18.4%** over the last 28 days; drift in the model's input columns 0% (all columns 38%, reference = the same weeks one year earlier); **promoted** (drift below threshold and holdout WAPE within tolerance).
+- Latest run (2026-11-06 06:43 UTC): sarima version 2, holdout WAPE **18.4%** over the last 28 days (seasonal_naive 22.8% on the same days); drift in the model's input columns 0% (all columns 38%, reference = the same weeks one year earlier); **promoted** (drift below threshold and holdout WAPE within 5% of seasonal_naive on the same window).
 - Gate demonstration with a synthetic shock in the newest window (`dfp retrain --simulate-drift`): input drift 50%, version 3 registered but **not promoted** (drift: 50% of the model's input columns drifted (threshold 30%)).
 <!-- /RETRAIN -->
 
@@ -104,7 +105,7 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 | Elasticity | log-log OLS with fixed effects (naive) and with week-of-year, the other hotel's demand and lead time as controls; the sign diagnoses simultaneity; pricing uses a stated planning assumption with a sensitivity range (ADR 0002) |
 | A/B | switchback simulation from the hotel's own seasonality and noise, analytic and Monte Carlo power, bootstrap CI, sensitivity, and the booking-level design that would have real power (ADR 0003) |
 | Tracking | MLflow 3 runs per backtest and per (re)train; the model packaged as a pyfunc and registered with alias `production` |
-| Retrain | holdout WAPE on the last 28 days plus Evidently data drift of the forecaster's input columns against the same weeks one year earlier; promote only when both gates pass; weekly GitHub Actions schedule (ADR 0004) |
+| Retrain | holdout WAPE on the last 28 days, compared on the same days with seasonal naive and, when the model type changes, with production's type (a refit of production's type is judged by the seasonal-naive floor), plus Evidently data drift of the forecaster's input columns against the same weeks one year earlier; promote only when both gates pass; weekly GitHub Actions schedule (ADR 0004) |
 | Serving | FastAPI with `X-API-Key`, per-key rate limit, request ids, structured logs, Prometheus metrics, model reload without restart (ADR 0005) |
 | Observability | 5 alert rules with promtool tests, Grafana dashboard, optional OpenTelemetry traces |
 | Delivery | uv-built non-root image, Compose (MLflow, API, retrain job, observability profile), Fly.io configs, Terraform for ECR + App Runner, CI with lint, types, unit, integration, pipeline, promtool, Terraform, gitleaks, pip-audit and image jobs |
@@ -115,12 +116,14 @@ The full readout, with caveats and next steps, is `reports/ab-readout.md`.
 uv sync --extra dev
 docker compose up -d mlflow && export MLFLOW_TRACKING_URI=http://localhost:5002
 make data elasticity ab backtest train      # reports/*.md and the registry
+export DFP_API_KEYS=dev-key                 # with no key set, the keyed routes refuse every request
 make serve                                  # http://localhost:8100/docs
 ```
 
 ```bash
-curl "http://localhost:8100/forecast?hotel=City%20Hotel&horizon=7"
-curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application/json" -d '{"hotel":"City Hotel","base_adr":120}'
+curl "http://localhost:8100/forecast?hotel=City%20Hotel&horizon=7" -H "X-API-Key: $DFP_API_KEYS"
+curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application/json" -H "X-API-Key: $DFP_API_KEYS" \
+  -d '{"hotel":"City Hotel","base_adr":120}'
 ```
 
 `docs/DEPLOY.md` covers the container stack, the scheduled retrain, Fly.io and the App Runner Terraform.
@@ -130,7 +133,7 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 | Method and path | Does |
 |---|---|
 | `GET /forecast?hotel=&horizon=` | next 1 to 28 days from the production model with 10/90 intervals (key, rate limited) |
-| `POST /price/recommend` | revenue-maximising price within a band for a date, from the forecast and the planning elasticity (or values you pass); the response names the elasticity's source |
+| `POST /price/recommend` | revenue-maximising price within a band for a date, from the forecast and the planning elasticity (or values you pass); optional `capacity` caps rooms sold and `unit_cost` turns it into profit; a flat curve (unit elasticity) recommends no change and says so in `flat`; the response names the elasticity's source |
 | `GET /model`, `POST /model/reload` | registry version in use; reload after a promotion |
 | `GET /health`, `GET /metrics` | 503 while no production model is loaded; Prometheus metrics |
 
@@ -138,8 +141,8 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 
 | Suite | Count | What |
 |---|---|---|
-| pytest unit | 20 | series construction and quality checks, metrics, feature frames, every forecaster's output, fold layout, backtest summary and champion rule, a failing model, elasticity on synthetic data with a known slope, lift arithmetic, pricing curve, A/B design and analysis coherence, Monte Carlo power, drift parser |
-| pytest integration | 2 | first train promotes; the gate blocks a drifted window and a worse holdout; the API serves forecasts and prices, enforces the key, rate limits, exposes metrics, reloads |
+| pytest unit | 32 | series construction and quality checks, metrics, feature frames, every forecaster's output, fold layout, backtest summary and champion rule, a failing model and a crashed fold, elasticity on synthetic data with a known slope, lift arithmetic, pricing curve with the flat-curve tie-break, capacity and unit cost, A/B design and analysis coherence, Monte Carlo power, drift parser, API errors and logs without credentials, keys required when none are configured, the pinned dataset hash |
+| pytest integration | 5 | first train promotes; the gate blocks a drifted window and a refit worse than the seasonal-naive floor, scores its references on the same window, and stops on a registry read error; the API serves forecasts and prices, enforces the key, rate limits, exposes metrics, reloads |
 | promtool | 6 scenarios | each alert fires and stays quiet when it should |
 | CI | 7 jobs | plus a pipeline job that runs data, elasticity, A/B, a short backtest, train and a blocked retrain on the real file |
 

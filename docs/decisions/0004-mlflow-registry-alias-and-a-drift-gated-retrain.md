@@ -19,9 +19,16 @@ because the data changed.
   ordinary seasonality as drift in the first version). The gate judges only the columns the forecaster
   consumes (arrivals, room-nights, cancellations, weekday); drift in prices, revenue and lead time is reported
   for a human but does not block, because the arrivals model does not read them. **Promote only if** the
-  input-column drift share < 30% **and** holdout WAPE is not worse than production by more than 5%
-  relative. Every run registers a version and writes `reports/retrain-latest.json` with the decision and its
-  reasons; a blocked run leaves the alias alone.
+  input-column drift share < 30% **and** holdout WAPE is not worse by more than 5% relative than each
+  reference fitted through the same cutoff and scored on the same 28 days: seasonal naive, the floor the
+  backtest champion had to beat, and production's model type when it differs from the challenger's. The
+  WAPE stored with an older version is not used: it was measured on a different window. A refit of
+  production's own type is not compared with itself, which would pass by construction, so on the weekly
+  refit of the champion the accuracy gate is the seasonal-naive floor; a seasonal-naive challenger is its own
+  floor, so only a different production type can block it. The registry is read first; any error other than
+  "no model or alias yet" stops the run. Every run registers a version and writes
+  `reports/retrain-latest.json` with the decision, its reasons and the reference WAPEs; a blocked run leaves
+  the alias alone.
 - `dfp retrain --simulate-drift` injects a synthetic shock into the newest window so the blocked path is
   exercised and recorded (`reports/retrain-blocked-example.json`); the integration test covers both paths.
 - Scheduled weekly by GitHub Actions against the production MLflow URL; a Compose `jobs` profile runs the same
@@ -33,6 +40,6 @@ because the data changed.
 - The holdout is the last 28 days of a static dataset, so locally "retrain" is a rehearsal; with live data
   the same code compares genuinely new weeks.
 - On this data the normal retrain passes (0% input drift, 38% across all columns because 2017 prices and
-  lead times differ from 2016) and the synthetic shock is blocked (50% input drift), which is the behaviour
-  a gate should have.
+  lead times differ from 2016; holdout WAPE 18.4% against 22.8% for seasonal naive on the same days) and the
+  synthetic shock is blocked (50% input drift), which is the behaviour a gate should have.
 - Evidently's report is saved as HTML next to the JSON for a human to look at.

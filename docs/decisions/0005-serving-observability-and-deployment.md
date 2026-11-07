@@ -8,10 +8,11 @@ The API is the part a product team integrates with; it has to be safe to expose,
 
 ## Decision
 
-- **FastAPI** with `X-API-Key` on `/forecast`, `/price/recommend` and `/model/reload` (open only when no keys
-  are configured, for local work), a per-key rate limit (slowapi), request ids, structured JSON logs
-  (structlog), and `prom-client` metrics: request latency by route pattern, forecast rows and recommendations
-  served, model version and `model_loaded`, rate-limit rejections.
+- **FastAPI** with `X-API-Key` on `/forecast`, `/price/recommend` and `/model/reload` (with no keys configured
+  they refuse every request; `DFP_ALLOW_UNAUTHENTICATED=true` opens them for local work), a per-key rate
+  limit (slowapi), request ids, structured JSON logs (structlog), and `prom-client` metrics: request latency
+  by route pattern, forecast rows and recommendations served, model version and `model_loaded`, rate-limit
+  rejections.
 - The model is loaded at start-up from the registry alias and can be reloaded without a restart; when there
   is no production model the service stays up, `/health` returns 503 and the `NoProductionModel` alert fires.
 - **Alerts**: ApiDown, NoProductionModel, HighErrorRate, SlowForecasts, RateLimitSpike, each with promtool

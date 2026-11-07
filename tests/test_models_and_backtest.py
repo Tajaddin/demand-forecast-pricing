@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from dfp.backtest import fold_origins, run_backtest, summarise, write_reports
-from dfp.data import hotel_series
+from dfp.data import HOTELS, hotel_series
 from dfp.models import ETS, LightGBMDirect, Naive, SeasonalNaive, make_future_features, make_supervised
+from dfp.tracking import residual_quantiles_from_backtest
 
 
 def test_baselines_repeat_history():
@@ -74,7 +76,7 @@ def test_backtest_scores_every_model_and_picks_a_champion(daily, tmp_path):
     assert "seasonal naive" in mp.read_text(encoding="utf-8")
 
 
-def test_a_failing_model_does_not_stop_the_backtest(daily):
+def test_a_failing_model_does_not_stop_the_backtest(daily, tmp_path):
     class Broken:
         name = "broken"
 
@@ -88,3 +90,54 @@ def test_a_failing_model_does_not_stop_the_backtest(daily):
     broken = out.results[out.results["model"] == "broken"]
     assert broken["wape"].isna().all()
     assert out.results[out.results["model"] == "seasonal_naive"]["wape"].notna().all()
+
+    meta = {"n_folds": 2, "step_days": 7, "horizons": [7], "first_day": "x", "last_day": "y"}
+    _, md = write_reports(
+        out, summarise(out.results, main_horizon=7), tmp_path, meta | {"first_origin": "a", "last_origin": "b"}
+    )
+    text = md.read_text(encoding="utf-8")
+    assert "nan" not in text and "| broken |" not in text
+    assert "broken failed on every hotel-fold (4): no scores" in text
+
+
+def test_a_crashed_fold_is_excluded_not_scored_as_perfect(daily):
+    class FailsFirstFit:
+        """Seasonal naive that crashes on its first fit only: on every other fold it is seasonal naive."""
+
+        name = "flaky"
+
+        def __init__(self):
+            self.inner, self.fits = SeasonalNaive(), 0
+
+        def fit(self, y):
+            self.fits += 1
+            if self.fits == 1:
+                raise RuntimeError("boom")
+            self.inner.fit(y)
+            return self
+
+        def predict(self, horizon):
+            return self.inner.predict(horizon)
+
+    out = run_backtest(
+        daily, horizons=(7, 14), n_folds=2, step=7, models=[SeasonalNaive(), FailsFirstFit()], log=lambda m: None
+    )
+    res = out.results
+    crashed = (res["model"] == "flaky") & (res["hotel"] == HOTELS[0]) & (res["fold"] == 0)
+    assert res.loc[crashed, "failed"].all() and res.loc[~crashed, "failed"].eq(False).all()
+
+    summary = summarise(res, main_horizon=14)
+    # with the crashed fold counted as zero error it beat seasonal naive and became the champion
+    assert summary["champion"] == "seasonal_naive"
+    pooled = pd.DataFrame(summary["pooled"]).set_index(["model", "horizon"])
+    assert pooled.loc[("flaky", 14), "failed_folds"] == 1 and pooled.loc[("seasonal_naive", 14), "failed_folds"] == 0
+    same_folds = res[
+        (res["model"] == "seasonal_naive")
+        & (res["horizon"] == 14)
+        & ~((res["hotel"] == HOTELS[0]) & (res["fold"] == 0))
+    ]
+    expected = same_folds["abs_error_sum"].sum() / same_folds["actual_sum"].sum() * 100
+    assert pooled.loc[("flaky", 14), "wape_pooled"] == pytest.approx(expected)
+
+    q = residual_quantiles_from_backtest(out.residuals, "flaky")
+    assert np.isfinite([v for steps in q.values() for pair in steps.values() for v in pair]).all()

@@ -1,6 +1,7 @@
 """The retrain job: refit the champion on the newest window, score it on a holdout, check the newest data for
-drift against the training window, compare with what is in production, and promote only when both gates
-pass. Every run writes reports/retrain-latest.json with the decision and its reasons.
+drift against the training window, compare its holdout WAPE with reference models scored on the same holdout,
+and promote only when both gates pass. Every completed run writes reports/retrain-latest.json with the decision
+and its reasons; a registry error stops the run before anything is fitted.
 """
 
 from __future__ import annotations
@@ -56,6 +57,10 @@ def retrain(
     simulate_drift: bool = False,
     model_type: str | None = None,
 ) -> dict:
+    prod = production_version(s)  # first: a registry error must stop the run, not read as "nothing in production"
+    prod_type = prod["tags"].get("model_type") if prod else None
+    if prod and prod_type is None:
+        raise ValueError(f"production version {prod['version']} has no model_type tag, so the gate cannot score it")
     reports = s.reports_dir
     reports.mkdir(parents=True, exist_ok=True)
     model_type = model_type or champion_from_report(reports)
@@ -78,8 +83,13 @@ def retrain(
     drift = run_drift(drift_frame(reference), drift_frame(current), reports, name="drift-latest")
 
     pooled, per_hotel = holdout_wape(daily, model_type, s.holdout_days, residuals)
-    prod = production_version(s)
-    prod_wape = float(prod["tags"]["holdout_wape"]) if prod and "holdout_wape" in prod["tags"] else None
+    # References are fitted through the same cutoff and scored on the same days as the challenger: seasonal naive,
+    # the floor the backtest champion had to beat, and production's model type. A reference of the challenger's own
+    # type would be the challenger itself, so it is skipped: a refit of production's type is judged by the floor.
+    references: dict[str, float] = {}
+    for ref in ("seasonal_naive", prod_type):
+        if ref is not None and ref != model_type and ref not in references:
+            references[ref], _ = holdout_wape(daily, ref, s.holdout_days, residuals)
 
     reasons = []
     # The gate judges the columns the forecaster consumes; price and revenue drift is reported for a human.
@@ -90,14 +100,23 @@ def retrain(
         reasons.append(
             f"drift: {gate_share:.0%} of the model's input columns drifted (threshold {s.drift_share_threshold:.0%})"
         )
-    quality_ok = prod_wape is None or pooled <= prod_wape * (1 + s.promotion_tolerance)
-    if not quality_ok:
+    beaten_by = {ref: w for ref, w in references.items() if pooled > w * (1 + s.promotion_tolerance)}
+    quality_ok = not beaten_by
+    for ref, w in beaten_by.items():
         reasons.append(
-            f"holdout WAPE {pooled:.1f}% is worse than production {prod_wape:.1f}% by more than {s.promotion_tolerance:.0%}"
+            f"holdout WAPE {pooled:.1f}% is worse than {ref} on the same window ({w:.1f}%) "
+            f"by more than {s.promotion_tolerance:.0%}"
         )
     promote = force_promote or (drift_ok and quality_ok)
     if force_promote and reasons:
         reasons.append("promoted anyway: --force")
+    if not reasons:
+        reasons.append(
+            f"drift below threshold and holdout WAPE within {s.promotion_tolerance:.0%} of {', '.join(references)} "
+            "on the same window"
+            if references
+            else "drift below threshold; no other model type to compare holdout WAPE with"
+        )
 
     model = fit_demand_model(daily, model_type, None, residuals)
     tags = {
@@ -133,11 +152,12 @@ def retrain(
         "model_type": model_type,
         "version": version,
         "promoted": promote,
-        "reasons": reasons or ["drift below threshold and holdout WAPE within tolerance"],
+        "reasons": reasons,
         "holdout_days": s.holdout_days,
         "holdout_wape": pooled,
         "holdout_wape_by_hotel": per_hotel,
-        "production_wape_before": prod_wape,
+        "reference_holdout_wape": references,
+        "production_model_type": prod_type,
         "production_version_before": prod["version"] if prod else None,
         "drift": {
             "gate_columns": GATE_COLUMNS,

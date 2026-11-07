@@ -11,6 +11,7 @@ make data elasticity ab                # reports/data-quality.json, elasticity.*
 make backtest                          # reports/backtest.md (a few minutes)
 make train                             # registers the champion, alias production
 make retrain-blocked                   # demonstrates the gate
+export DFP_API_KEYS=dev-key            # with no key set, the keyed routes refuse every request
 make serve                             # http://localhost:8100/docs
 ```
 
@@ -37,7 +38,8 @@ curl -X POST http://localhost:8100/price/recommend -H "Content-Type: application
 ## Scheduled retrain
 
 `.github/workflows/retrain.yml` runs `dfp retrain` every Monday against `MLFLOW_TRACKING_URI` from the
-`production` environment secrets and keeps the reports as an artifact. Without that secret it falls back to a
+`production` environment secrets (with `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` when the server
+has basic auth) and keeps the reports as an artifact. Without that secret it falls back to a
 throwaway SQLite store: the gates and reports still run, but nothing reaches a registry. The Compose `jobs`
 profile runs the same command: `docker compose --profile jobs run --rm retrain`.
 
@@ -48,25 +50,30 @@ export MLFLOW_USER=admin MLFLOW_PASSWORD='...' DFP_API_KEYS='...'
 make deploy
 ```
 
-`scripts/deploy.sh` creates two apps: `dfp-mlflow` (MLflow server with a 1 GB volume, basic auth; create the
-first user with `fly ssh console -a dfp-mlflow -C "mlflow auth create-user ..."` as the MLflow docs describe) and
-`dfp-api`, with `MLFLOW_TRACKING_URI` and `DFP_API_KEYS` as secrets. Then populate the registry from this machine:
+`scripts/deploy.sh` creates two apps: `dfp-mlflow` (MLflow server with a 1 GB volume and basic auth; MLflow has
+no default admin password and creates the admin on first start from the `MLFLOW_AUTH_ADMIN_USERNAME` and
+`MLFLOW_AUTH_ADMIN_PASSWORD` secrets, which the script sets from `MLFLOW_USER` and `MLFLOW_PASSWORD`) and
+`dfp-api`, with `MLFLOW_TRACKING_URI`, `MLFLOW_TRACKING_USERNAME`, `MLFLOW_TRACKING_PASSWORD` and `DFP_API_KEYS`
+as secrets. MLflow reads the credentials from those two variables; keep them out of the URI, which MLflow quotes
+in its error messages. Then populate the registry from this machine:
 
 ```bash
-MLFLOW_TRACKING_URI=https://admin:...@dfp-mlflow.fly.dev make backtest train
+MLFLOW_TRACKING_URI=https://dfp-mlflow.fly.dev MLFLOW_TRACKING_USERNAME=admin MLFLOW_TRACKING_PASSWORD='...' make backtest train
 curl -X POST https://dfp-api.fly.dev/model/reload -H "X-API-Key: ..."
 ```
 
 ## AWS App Runner (Terraform)
 
 ```bash
-cd infra/terraform && cp terraform.tfvars.example terraform.tfvars   # MLflow URL, API keys
+cd infra/terraform && cp terraform.tfvars.example terraform.tfvars   # MLflow URL and login, API keys
 terraform init && terraform apply                                     # ECR repo, App Runner service, SSM secrets
 aws ecr get-login-password | docker login --username AWS --password-stdin "$(terraform output -raw ecr_repository_url | cut -d/ -f1)"
 docker build -t "$(terraform output -raw ecr_repository_url):0.1.0" .. && docker push "$(terraform output -raw ecr_repository_url):0.1.0"
 ```
 
-App Runner redeploys on push (auto deployments). Smallest size, about $5 a month while it runs.
+App Runner redeploys on push (auto deployments). Smallest size, about $5 a month while it runs. The MLflow
+user and password reach the service as `MLFLOW_TRACKING_USERNAME` and `MLFLOW_TRACKING_PASSWORD` from SSM,
+like the other secrets; leave `mlflow_tracking_username` empty for a server without basic auth.
 
 ## Teardown
 

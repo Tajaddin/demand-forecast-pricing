@@ -14,9 +14,21 @@ variable "image_tag" {
 }
 
 variable "mlflow_tracking_uri" {
-  description = "MLflow server the API loads the production model from (with credentials in the URL if basic auth is on)"
+  description = "MLflow server the API loads the production model from, without credentials"
   type        = string
   sensitive   = true
+}
+
+variable "mlflow_tracking_username" {
+  description = "MLflow basic-auth user; empty when the server has no auth"
+  type        = string
+  default     = ""
+}
+
+variable "mlflow_tracking_password" {
+  type      = string
+  default   = ""
+  sensitive = true
 }
 
 variable "api_keys" {
